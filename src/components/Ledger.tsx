@@ -66,14 +66,26 @@ export default function Ledger() {
             ACTION ITEMS
           </div>
           <div className="ledger-divider" />
-          <ul className="action-list">
+          <div className="action-list">
             {actionItems.map((item, i) => (
-              <li key={i} className="action-item">
-                <span className="action-bullet">▸</span>
-                {item}
-              </li>
+              <div key={i} className="action-item-card">
+                <div className="action-item-header">
+                  <span className="action-bullet">▸</span>
+                  <span className="action-owner">{item.owner}</span>
+                </div>
+                <div className="action-task">{item.task}</div>
+                {item.deadline_mentioned && (
+                  <div className="action-detail">
+                    <span className="action-detail-key">deadline</span>
+                    <span className="action-detail-val">{item.deadline_mentioned}</span>
+                  </div>
+                )}
+                {item.verbatim_quote && (
+                  <div className="action-quote">"{item.verbatim_quote}"</div>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         </>
       )}
     </div>

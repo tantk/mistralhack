@@ -1,9 +1,22 @@
 import { create } from 'zustand'
-import type { Segment, Decision, Ambiguity } from '../api/client'
+import type {
+  Segment,
+  Decision,
+  Ambiguity,
+  ActionItem,
+  MeetingDynamics,
+  Word,
+  ToolCallEntry,
+  SpeakerResolutionEntry,
+} from '../api/client'
 
-export type Phase = 'transcribing' | 'diarizing' | 'analyzing'
+export type Phase = 'transcribing' | 'diarizing' | 'resolving' | 'analyzing'
 export type Stage = 'idle' | 'uploading' | 'processing' | 'results'
 export type ResultTab = 'timeline' | 'ledger' | 'clarifications'
+
+interface ToolCallWithResult extends ToolCallEntry {
+  result?: string
+}
 
 interface AppState {
   stage: Stage
@@ -14,11 +27,17 @@ interface AppState {
   transcript: string
   revealedWordCount: number
   audioDuration: number
+  words: Word[]
+  language: string | null
 
   segments: Segment[]
   decisions: Decision[]
   ambiguities: Ambiguity[]
-  actionItems: string[]
+  actionItems: ActionItem[]
+  meetingDynamics: MeetingDynamics | null
+
+  toolCalls: ToolCallWithResult[]
+  speakerResolutions: SpeakerResolutionEntry[]
 
   activeAmbiguityIndex: number
   resolvedAmbiguities: Record<number, string | 'skipped'>
@@ -35,10 +54,16 @@ interface AppState {
   appendTranscript: (token: string) => void
   setRevealedWordCount: (n: number) => void
   setAudioDuration: (d: number) => void
+  setWords: (w: Word[]) => void
+  setLanguage: (l: string | null) => void
   setSegments: (s: Segment[]) => void
   setDecisions: (d: Decision[]) => void
   setAmbiguities: (a: Ambiguity[]) => void
-  setActionItems: (a: string[]) => void
+  setActionItems: (a: ActionItem[]) => void
+  setMeetingDynamics: (m: MeetingDynamics | null) => void
+  addToolCall: (tc: ToolCallEntry) => void
+  updateLastToolResult: (tool: string, result: string) => void
+  addSpeakerResolution: (sr: SpeakerResolutionEntry) => void
   setAudioUrl: (u: string | null) => void
   setActiveTab: (t: ResultTab) => void
   resolveAmbiguity: (idx: number, resolution: string | 'skipped') => void
@@ -54,10 +79,15 @@ const initial = {
   transcript: '',
   revealedWordCount: 0,
   audioDuration: 0,
+  words: [] as Word[],
+  language: null as string | null,
   segments: [] as Segment[],
   decisions: [] as Decision[],
   ambiguities: [] as Ambiguity[],
-  actionItems: [] as string[],
+  actionItems: [] as ActionItem[],
+  meetingDynamics: null as MeetingDynamics | null,
+  toolCalls: [] as ToolCallWithResult[],
+  speakerResolutions: [] as SpeakerResolutionEntry[],
   activeAmbiguityIndex: 0,
   resolvedAmbiguities: {} as Record<number, string | 'skipped'>,
   audioUrl: null as string | null,
@@ -74,10 +104,28 @@ export const useStore = create<AppState>((set) => ({
   appendTranscript: (token) => set((s) => ({ transcript: s.transcript + token })),
   setRevealedWordCount: (revealedWordCount) => set({ revealedWordCount }),
   setAudioDuration: (audioDuration) => set({ audioDuration }),
+  setWords: (words) => set({ words }),
+  setLanguage: (language) => set({ language }),
   setSegments: (segments) => set({ segments }),
   setDecisions: (decisions) => set({ decisions }),
   setAmbiguities: (ambiguities) => set({ ambiguities }),
   setActionItems: (actionItems) => set({ actionItems }),
+  setMeetingDynamics: (meetingDynamics) => set({ meetingDynamics }),
+  addToolCall: (tc) =>
+    set((s) => ({ toolCalls: [...s.toolCalls, tc] })),
+  updateLastToolResult: (tool, result) =>
+    set((s) => {
+      const calls = [...s.toolCalls]
+      for (let i = calls.length - 1; i >= 0; i--) {
+        if (calls[i].tool === tool && !calls[i].result) {
+          calls[i] = { ...calls[i], result }
+          break
+        }
+      }
+      return { toolCalls: calls }
+    }),
+  addSpeakerResolution: (sr) =>
+    set((s) => ({ speakerResolutions: [...s.speakerResolutions, sr] })),
   setAudioUrl: (audioUrl) => set({ audioUrl }),
   setActiveTab: (activeTab) => set({ activeTab }),
   resolveAmbiguity: (idx, resolution) =>

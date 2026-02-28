@@ -12,7 +12,7 @@ const TABS: { id: ResultTab; label: string }[] = [
 ]
 
 export default function Results() {
-  const { activeTab, setActiveTab, decisions, ambiguities, resolvedAmbiguities, reset } = useStore()
+  const { activeTab, setActiveTab, decisions, ambiguities, resolvedAmbiguities, meetingDynamics, reset } = useStore()
 
   const pendingClarifs = ambiguities.filter((_, i) => !resolvedAmbiguities[i]).length
 
@@ -29,6 +29,36 @@ export default function Results() {
           ← New Meeting
         </button>
       </header>
+
+      {/* Meeting Dynamics Bar */}
+      {meetingDynamics && (
+        <div className="dynamics-bar">
+          <div className="dynamics-talk-time">
+            {Object.entries(meetingDynamics.talk_time_pct)
+              .sort(([, a], [, b]) => b - a)
+              .map(([speaker, pct]) => (
+                <div key={speaker} className="dynamics-speaker">
+                  <span className="dynamics-speaker-name">{speaker}</span>
+                  <div className="dynamics-bar-track">
+                    <motion.div
+                      className="dynamics-bar-fill"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                    />
+                  </div>
+                  <span className="dynamics-pct">{pct.toFixed(1)}%</span>
+                </div>
+              ))}
+          </div>
+          {meetingDynamics.interruption_count > 0 && (
+            <div className="dynamics-interruptions">
+              <span className="dynamics-int-count">{meetingDynamics.interruption_count}</span>
+              <span className="dynamics-int-label">interruptions</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <nav className="tab-nav">
         {TABS.map((tab) => (

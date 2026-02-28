@@ -2,11 +2,20 @@ import { z } from 'zod'
 
 // ─── Zod schemas (validated at runtime boundaries) ──────────────────────────
 
+export const WordSchema = z.object({
+  word: z.string(),
+  start: z.number(),
+  end: z.number(),
+})
+
 export const SegmentSchema = z.object({
   speaker: z.string(),
   start: z.number(),
   end: z.number(),
   text: z.string(),
+  is_overlap: z.boolean().optional().default(false),
+  confidence: z.number().optional().default(0),
+  active_speakers: z.array(z.string()).optional().default([]),
 })
 
 export const DecisionSchema = z.object({
@@ -27,10 +36,41 @@ export const AmbiguitySchema = z.object({
   candidates: z.array(z.string()),
 })
 
+export const ActionItemSchema = z.object({
+  owner: z.string(),
+  task: z.string(),
+  deadline_mentioned: z.string().nullable().optional(),
+  verbatim_quote: z.string().nullable().optional(),
+})
+
+export const MeetingDynamicsSchema = z.object({
+  talk_time_pct: z.record(z.string(), z.number()),
+  interruption_count: z.number(),
+})
+
+export const ToolCallSchema = z.object({
+  tool: z.string(),
+  args: z.record(z.unknown()),
+})
+
+export const ToolResultSchema = z.object({
+  tool: z.string(),
+  result: z.string(),
+})
+
+export const SpeakerResolvedSchema = z.object({
+  label: z.string(),
+  name: z.string(),
+  confidence: z.number(),
+  method: z.string(),
+})
+
 export const JobCreatedSchema = z.object({ job_id: z.string() })
 
 export const TranscriptCompleteSchema = z.object({
   text: z.string(),
+  words: z.array(WordSchema).optional().default([]),
+  language: z.string().nullable().optional(),
   duration_ms: z.number(),
 })
 
@@ -41,14 +81,21 @@ export const DiarizationCompleteSchema = z.object({
 export const AnalysisCompleteSchema = z.object({
   decisions: z.array(DecisionSchema),
   ambiguities: z.array(AmbiguitySchema),
-  action_items: z.array(z.string()),
+  action_items: z.array(ActionItemSchema),
+  meeting_dynamics: MeetingDynamicsSchema.optional(),
 })
 
 // ─── Inferred types ──────────────────────────────────────────────────────────
 
+export type Word = z.infer<typeof WordSchema>
 export type Segment = z.infer<typeof SegmentSchema>
 export type Decision = z.infer<typeof DecisionSchema>
 export type Ambiguity = z.infer<typeof AmbiguitySchema>
+export type ActionItem = z.infer<typeof ActionItemSchema>
+export type MeetingDynamics = z.infer<typeof MeetingDynamicsSchema>
+export type ToolCallEntry = z.infer<typeof ToolCallSchema>
+export type ToolResultEntry = z.infer<typeof ToolResultSchema>
+export type SpeakerResolutionEntry = z.infer<typeof SpeakerResolvedSchema>
 export type AnalysisResult = z.infer<typeof AnalysisCompleteSchema>
 
 // ─── Auth helpers ───────────────────────────────────────────────────────────
@@ -63,7 +110,7 @@ export function promptApiKey(): string {
   return key || ''
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const key = getApiKey()
   return key ? { Authorization: `Bearer ${key}` } : {}
 }
@@ -88,4 +135,3 @@ export async function submitJob(file: File): Promise<string> {
   const data = JobCreatedSchema.parse(await res.json())
   return data.job_id
 }
-

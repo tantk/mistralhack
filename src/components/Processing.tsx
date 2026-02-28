@@ -5,20 +5,24 @@ import { useSSE } from '../hooks/useSSE'
 const PHASES = [
   { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech → Text' },
   { id: 'diarizing', label: 'PYANNOTE + ERES2NET', sub: 'Speaker Separation' },
+  { id: 'resolving', label: 'MISTRAL AGENT', sub: 'Speaker Resolution' },
   { id: 'analyzing', label: 'MISTRAL LARGE 3', sub: 'Decision Intelligence' },
 ] as const
 
 type PhaseId = typeof PHASES[number]['id']
 
-const PHASE_ORDER: PhaseId[] = ['transcribing', 'diarizing', 'analyzing']
+const PHASE_ORDER: PhaseId[] = ['transcribing', 'diarizing', 'resolving', 'analyzing']
 
 export default function Processing() {
-  const { jobId, phase, transcript } = useStore()
+  const { jobId, phase, transcript, toolCalls, speakerResolutions } = useStore()
 
   // Connect SSE (or fallback poll) for this job
   useSSE(jobId)
 
   const currentIndex = phase ? PHASE_ORDER.indexOf(phase) : -1
+
+  // Show last 5 tool calls for agent activity panel
+  const recentToolCalls = toolCalls.slice(-5)
 
   return (
     <div className="processing-screen">
@@ -85,6 +89,51 @@ export default function Processing() {
             <span className="cursor-blink" />
           </div>
         </div>
+
+        {/* Agent activity panel — visible during resolving phase */}
+        {phase === 'resolving' && (
+          <motion.div
+            className="agent-activity-panel"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="agent-activity-header">
+              <span className="agent-pulse" />
+              AGENT ACTIVITY
+            </div>
+            <div className="agent-activity-body">
+              {recentToolCalls.length === 0 && (
+                <p className="agent-waiting">Agent is analyzing speakers...</p>
+              )}
+              {recentToolCalls.map((tc, i) => (
+                <div key={i} className="agent-tool-entry">
+                  <span className="agent-tool-name">{tc.tool}</span>
+                  <span className="agent-tool-args">
+                    {JSON.stringify(tc.args).slice(0, 80)}
+                    {JSON.stringify(tc.args).length > 80 ? '...' : ''}
+                  </span>
+                  {tc.result && (
+                    <span className="agent-tool-result">{tc.result.slice(0, 100)}</span>
+                  )}
+                </div>
+              ))}
+              {speakerResolutions.length > 0 && (
+                <div className="agent-resolutions">
+                  {speakerResolutions.map((sr, i) => (
+                    <div key={i} className="agent-resolution-entry">
+                      <span className="resolution-arrow">
+                        {sr.label} → {sr.name}
+                      </span>
+                      <span className="resolution-confidence">
+                        ({(sr.confidence * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         <p className="processing-hint">
           Pipeline running — this may take a few minutes for long recordings.
