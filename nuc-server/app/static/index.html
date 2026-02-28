@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Minutes</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Meeting Minutes</h1>
+    <span id="connection-status" class="status-msg"></span>
+  </header>
+
+  <main>
+    <!-- Meeting List View -->
+    <div id="view-list" class="view active">
+      <div class="new-meeting-form">
+        <input type="text" id="meeting-title" placeholder="New meeting title..." />
+        <button id="btn-new-meeting">Start Meeting</button>
+      </div>
+      <ul id="meeting-list" class="meeting-list"></ul>
+      <div id="list-empty" class="empty-state" style="display:none;">
+        No meetings yet. Create one above.
+      </div>
+    </div>
+
+    <!-- Live Transcription View -->
+    <div id="view-live" class="view">
+      <span class="back-link" id="btn-back-live">&larr; Back</span>
+      <div class="transcript-header">
+        <h2 id="live-title"></h2>
+        <span class="recording-indicator" id="rec-indicator">
+          <span class="recording-dot"></span> Recording
+        </span>
+      </div>
+      <div class="transcript-segments" id="live-segments"></div>
+      <p class="status-msg" id="live-status"></p>
+      <div class="actions">
+        <button class="btn-danger" id="btn-end-meeting">End Meeting</button>
+      </div>
+    </div>
+
+    <!-- Meeting Detail View -->
+    <div id="view-detail" class="view">
+      <span class="back-link" id="btn-back-detail">&larr; Back</span>
+      <div class="transcript-header">
+        <h2 id="detail-title"></h2>
+        <span class="badge" id="detail-badge"></span>
+      </div>
+      <div class="transcript-segments" id="detail-segments"></div>
+      <div class="actions" id="detail-actions"></div>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -19,3 +19,4 @@ venv/
 
 # Test audio (optional - large binary files)
 *.wav
+*.db
