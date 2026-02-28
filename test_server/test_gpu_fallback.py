@@ -19,7 +19,7 @@ import requests
 sys.path.insert(0, os.path.dirname(__file__))
 
 SERVICE_URL = os.environ.get("SERVICE_URL", "http://localhost:8000")
-API_KEY = os.environ.get("API_KEY", "4227c2a924c8706c1eadf1691165091f92002ebb198c3cdf")
+API_KEY = os.environ.get("API_KEY", "")
 DIARIZATION_URL = os.environ.get("DIARIZATION_URL", "http://192.168.0.105:8001")
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 AUDIO_DIR = os.path.join(PROJECT_ROOT, "data", "audio_samples")

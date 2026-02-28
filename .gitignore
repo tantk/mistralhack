@@ -26,5 +26,8 @@ node_modules/
 **/node_modules/
 hackathon_plan.md
 
+# Test results (may contain service URLs/tokens)
+test_server/*_results.json
+
 # Build output
 dist/
