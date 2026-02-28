@@ -51,6 +51,10 @@ impl VoiceprintStore {
         let collection = match zvec_bindings::open_shared(store_path) {
             Ok(c) => c,
             Err(_) => {
+                // zvec requires the path to not exist for create_and_open_shared
+                if std::path::Path::new(store_path).exists() {
+                    std::fs::remove_dir_all(store_path)?;
+                }
                 let mut schema = CollectionSchema::new("voiceprints");
                 schema
                     .add_field(VectorSchema::fp32("embedding", EMBEDDING_DIM).into())
