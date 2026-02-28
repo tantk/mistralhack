@@ -17,7 +17,8 @@ venv/
 # Environment
 .env
 
-# Test audio (optional - large binary files)
+# Test audio / datasets (large binary files)
+data/
 *.wav
 *.db
 /.claude

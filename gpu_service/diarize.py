@@ -41,11 +41,14 @@ def diarize(
     waveform = torch.from_numpy(audio_16k).unsqueeze(0).float()
     input_data = {"waveform": waveform, "sample_rate": TARGET_SAMPLE_RATE}
 
-    diarization = pipeline(
+    result = pipeline(
         input_data,
         min_speakers=min_speakers or PYANNOTE_MIN_SPEAKERS,
         max_speakers=max_speakers or PYANNOTE_MAX_SPEAKERS,
     )
+
+    # pyannote v4 returns DiarizeOutput dataclass; extract the Annotation
+    diarization = getattr(result, "speaker_diarization", result)
 
     segments = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):

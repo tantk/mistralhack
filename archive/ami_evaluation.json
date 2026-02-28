@@ -1,0 +1,93 @@
+{
+  "dataset": "edinburghcstr/ami",
+  "url": "https://huggingface.co/datasets/edinburghcstr/ami",
+  "meeting": "EN2002b",
+  "wer": {
+    "normalized_wer": 0.2767,
+    "normalized_cer": 0.2002,
+    "num_samples": 10,
+    "samples": [
+      {
+        "file": "ami_wer_00.flac",
+        "speaker_id": "FEO070",
+        "duration": 23.3,
+        "reference": "HE HE D HE DOESN'T HAVE TO KNOW EXACTLY WHAT I MEAN YEAH M I MEAN IT'S HOT FINISHED BUT IT DOESN'T REALLY SAY",
+        "voxtral": "He doesn't have to know exactly what I've done. I mean, yeah, I mean, it's not finished, but it doesn't really matter."
+      },
+      {
+        "file": "ami_wer_01.flac",
+        "speaker_id": "FEO070",
+        "duration": 18.6,
+        "reference": "SO IF YOU CAN WORK ON IT THAT AND THEN LIKE NO ACTUALLY NOT",
+        "voxtral": "So if you can work on that, and then I can. No, actually not."
+      },
+      {
+        "file": "ami_wer_02.flac",
+        "speaker_id": "FEO070",
+        "duration": 13.2,
+        "reference": "HMM SHE NEVER SAID THAT",
+        "voxtral": "She never said that."
+      },
+      {
+        "file": "ami_wer_03.flac",
+        "speaker_id": "MEE073",
+        "duration": 12.1,
+        "reference": "UM ACTUALLY FIRST THING I JUST SORTA DID A REALLY SORTA BRIEF UM YEAH VERSION OF WHAT WE HAVE TO DO",
+        "voxtral": "Actually, I guess first thing I just sort of did a really sort of brief, you know, version of what we have to do."
+      },
+      {
+        "file": "ami_wer_04.flac",
+        "speaker_id": "FEO072",
+        "duration": 11.8,
+        "reference": "BUT UH SO WE'RE ALL STILL WRITING OUR UM SUMMARIES SENDING THEM TO YOU YOU SEND IT ON TO PERNILLA",
+        "voxtral": "So we're all still writing our summaries, sending them to you. You send it on to Penelope."
+      },
+      {
+        "file": "ami_wer_05.flac",
+        "speaker_id": "MEE071",
+        "duration": 10.7,
+        "reference": "JUST YEAH WELL IT JUST UM WHEN HE PULLS UP THE SEGMENTS UM PART OF THAT ONE OF THE F ONE OF THE ATTRIBUTES YOU DO GET ATTRIBUTES",
+        "voxtral": "Yeah, when he pulls up the segments, part of that, one of the attributes, if you do get attributes, call them ethical,"
+      },
+      {
+        "file": "ami_wer_06.flac",
+        "speaker_id": "FEO072",
+        "duration": 10.1,
+        "reference": "UM UM SO MAYBE I MEAN WE WE SHOULD WE SHOULD DEFINITELY WELL WE COULD PROBABLY NOT PUT IT UNDER THIS HEADING",
+        "voxtral": "So maybe, I mean, we should definitely, well, we could probably not put it under this heading,"
+      },
+      {
+        "file": "ami_wer_07.flac",
+        "speaker_id": "MEE073",
+        "duration": 10.1,
+        "reference": "SO THE SUMMARY AND THE TOPIC AND THE TRANSCRIPT ARE UM SO UM OR WE COULD JUST PUT THEM ALL INTO ONE RESULT PANE ON THAT SAME WINDOW AND JUST INDICATE",
+        "voxtral": "So the summary and the topic and then transcript. So, or we could just put them all into one result pane on that same window and just indicate."
+      },
+      {
+        "file": "ami_wer_08.flac",
+        "speaker_id": "MEE071",
+        "duration": 9.9,
+        "reference": "I JUST SAID I SAID WHAT I'VE DONE SO FAR AND WHAT I'M GONNA DO AND SOME PRO SOME ISSUES",
+        "voxtral": "I just said what I've done so far and what I'm going to do. And some issues."
+      },
+      {
+        "file": "ami_wer_09.flac",
+        "speaker_id": "FEO070",
+        "duration": 9.8,
+        "reference": "I THINK IT UM ONE THING THAT WE COULD PROBABLY SKIP UH TOTALLY IS THE REMOVING THINGS FROM THE AUDIO FILES",
+        "voxtral": "I think one thing that we could probably skip totally is the removing things from the audio files."
+      }
+    ]
+  },
+  "der": {
+    "collar_025": 0.2664,
+    "num_gt_speakers": 4,
+    "num_voxtral_speakers": 10,
+    "speaker_mapping": {
+      "speaker_3": "FIE088",
+      "speaker_4": "FIO089",
+      "speaker_5": "FIO087",
+      "speaker_6": "FIO084"
+    }
+  }
+}

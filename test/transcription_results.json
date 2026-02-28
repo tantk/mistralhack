@@ -1,0 +1,180 @@
+{
+  "peoples_speech": {
+    "name": "People's Speech (10 samples)",
+    "service_url": "https://tan.tail2e1adb.ts.net/api/transcribe",
+    "num_files": 10,
+    "overall_wer": 0.1367,
+    "overall_cer": 0.0988,
+    "per_file": [
+      {
+        "file": "sample_00.flac",
+        "reference": "i wanted this to share a few things but i'm going to not share as much as i wanted to share because we are starting late i'd like to get this thing going so we all get home at a decent hour this this election is very important to",
+        "hypothesis": "I wanted to share a few things, but I'm going to not share as much as I wanted to share because we are starting late. I'd like to get this thing going so we all get home at a decent hour. This election is very important to.",
+        "norm_wer": 0.0408,
+        "norm_cer": 0.0441,
+        "elapsed_s": 15.74
+      },
+      {
+        "file": "sample_01.flac",
+        "reference": "state we support agriculture to the tune of point four percent no way i made a mistake this year they lowered it from point four percent to point three eight percent and in the same breath they're saying food",
+        "hypothesis": "State we support agriculture to the tune of 0.4%. Oh, no, wait, I made a mistake. This year they lowered it from 0.4% to 0.38%. And in the same breath, they're saying fooditsos.",
+        "norm_wer": 0.25,
+        "norm_cer": 0.1878,
+        "elapsed_s": 17.99
+      },
+      {
+        "file": "sample_02.flac",
+        "reference": "security so it doesn't feel very secure to me as a farmer to hear that and my family and i we've been farming here since nineteen ninety",
+        "hypothesis": "Security. So it doesn't feel very secure to me as a farmer to hear that. And my family and I, we've been farming here since 1993..",
+        "norm_wer": 0.0385,
+        "norm_cer": 0.0164,
+        "elapsed_s": 16.2
+      },
+      {
+        "file": "sample_03.flac",
+        "reference": "three and we produce last year we produce twenty one thousand pounds of food for the community on two thousand square feet so unless we were that efficient to produce that much food ",
+        "hypothesis": "And we produce, last year we produced 21,000 pounds of food for the community on 2,000 square feet. So unless we were that efficient, to produce that much foodished,",
+        "norm_wer": 0.1,
+        "norm_cer": 0.0516,
+        "elapsed_s": 15.75
+      },
+      {
+        "file": "sample_04.flac",
+        "reference": "commons here in the spirit of being able to grow our food here locally so we started as an organization in actually in two thousand and nine but really in two thousand and ten march of two thousand and ten we had our first meeting",
+        "hypothesis": "Commons here in the spirit of being able to grow our food here locally. So we started as an organization and actually in 2009, but really in 2010, March of 2010, we had our first meeting.",
+        "norm_wer": 0.2381,
+        "norm_cer": 0.1095,
+        "elapsed_s": 15.8
+      },
+      {
+        "file": "sample_05.flac",
+        "reference": "on maui and now we have ten chapters across the islands and about nine hundred members so we are growing exponentially and we're fortunate to know that we have not only",
+        "hypothesis": "Maui and now we have 10 chapters across the islands and about 900 members so we are growing exponentially and we're fortunate to know that we have not only",
+        "norm_wer": 0.0333,
+        "norm_cer": 0.0191,
+        "elapsed_s": 15.59
+      },
+      {
+        "file": "sample_06.flac",
+        "reference": "farmers but gardeners and foodies alike who value our mission and what we're what we're about in rejuvenating our lands and also at the same time advocating for our local food production so what we've done as an",
+        "hypothesis": "Farmers, the gardeners and foodies alike who value our mission and what we're about in rejuvenating our lands and also at the same time advocating for our local food production. So what we've done as an organization.ishedoc, is that we've beenized",
+        "norm_wer": 0.2105,
+        "norm_cer": 0.2644,
+        "elapsed_s": 16.08
+      },
+      {
+        "file": "sample_07.flac",
+        "reference": "organisation is put together a five point plan you'll hear about that five point plan tonight in our questions and that five point plan basically deals with the whole system of agriculture what makes up the whole system of agriculture and as we see it is",
+        "hypothesis": "organization has put together a five-point plan and you'll hear about that five-point plan tonight in our questions and that five-point plan basically deals with the whole system of agriculture what makes up a whole system of agriculture and as we see it is",
+        "norm_wer": 0.2326,
+        "norm_cer": 0.1724,
+        "elapsed_s": 17.24
+      },
+      {
+        "file": "sample_08.flac",
+        "reference": "at forty years old getting into farming didn't know what i was doing i was a gardener you know but i had the passion and that's what i still have today and that's what's can sustain our family farm along with my wife's passion and our son who works full time on the farm and our",
+        "hypothesis": "At 40 years old, getting into farming, didn't know what I was doing. I was a gardener, you know. But I had the passion, and that's what I still have today, and that's what's sustained our family farm, along with my wife's passion and our son, who works full-time on the farm, and ourous.",
+        "norm_wer": 0.0893,
+        "norm_cer": 0.037,
+        "elapsed_s": 15.65
+      },
+      {
+        "file": "sample_09.flac",
+        "reference": "daughter who came out of it actually she designs and fabricate her own women's swimwear line so here she grew up in a farm family knew about being an entrepreneur and she went and got to go work for somebody else you know and design",
+        "hypothesis": "daughter who came out of it actually she designs and fabricates her own women's swimwear line so here she grew up in a farm family knew about being an entrepreneur and she went and god i'm not gonna go work for somebody else you know and design",
+        "norm_wer": 0.1111,
+        "norm_cer": 0.0519,
+        "elapsed_s": 19.76
+      }
+    ]
+  },
+  "ami": {
+    "name": "AMI Meeting Segments (10 segments)",
+    "service_url": "https://tan.tail2e1adb.ts.net/api/transcribe",
+    "num_files": 10,
+    "overall_wer": 0.2379,
+    "overall_cer": 0.1682,
+    "per_file": [
+      {
+        "file": "ami_wer_00.flac",
+        "reference": "HE HE D HE DOESN'T HAVE TO KNOW EXACTLY WHAT I MEAN YEAH M I MEAN IT'S HOT FINISHED BUT IT DOESN'T REALLY SAY",
+        "hypothesis": "He doesn't have to know exactly I mean yeah, I meant I mean it's not finished, but it doesn't really say",
+        "norm_wer": 0.2917,
+        "norm_cer": 0.1887,
+        "elapsed_s": 29.16
+      },
+      {
+        "file": "ami_wer_01.flac",
+        "reference": "SO IF YOU CAN WORK ON IT THAT AND THEN LIKE NO ACTUALLY NOT",
+        "hypothesis": "So if you can work on that, and then No, actually no..",
+        "norm_wer": 0.2143,
+        "norm_cer": 0.1525,
+        "elapsed_s": 24.0
+      },
+      {
+        "file": "ami_wer_02.flac",
+        "reference": "HMM SHE NEVER SAID THAT",
+        "hypothesis": "Should never have said that..",
+        "norm_wer": 0.6,
+        "norm_cer": 0.5217,
+        "elapsed_s": 21.84
+      },
+      {
+        "file": "ami_wer_03.flac",
+        "reference": "UM ACTUALLY FIRST THING I JUST SORTA DID A REALLY SORTA BRIEF UM YEAH VERSION OF WHAT WE HAVE TO DO",
+        "hypothesis": "Actually, I guess the first thing I just sort of did a really sort of brief version of what we have to do..",
+        "norm_wer": 0.4762,
+        "norm_cer": 0.2929,
+        "elapsed_s": 17.32
+      },
+      {
+        "file": "ami_wer_04.flac",
+        "reference": "BUT UH SO WE'RE ALL STILL WRITING OUR UM SUMMARIES SENDING THEM TO YOU YOU SEND IT ON TO PERNILLA",
+        "hypothesis": "So we're all still writing our summaries, sending them to you, you send it on to Penelope.",
+        "norm_wer": 0.2,
+        "norm_cer": 0.1562,
+        "elapsed_s": 17.63
+      },
+      {
+        "file": "ami_wer_05.flac",
+        "reference": "JUST YEAH WELL IT JUST UM WHEN HE PULLS UP THE SEGMENTS UM PART OF THAT ONE OF THE F ONE OF THE ATTRIBUTES YOU DO GET ATTRIBUTES",
+        "hypothesis": "Yeah, we're just when he pulls up the segments, part of that one of the f one of the attributes, we do get attributes, call a method called",
+        "norm_wer": 0.3571,
+        "norm_cer": 0.3226,
+        "elapsed_s": 17.94
+      },
+      {
+        "file": "ami_wer_06.flac",
+        "reference": "UM UM SO MAYBE I MEAN WE WE SHOULD WE SHOULD DEFINITELY WELL WE COULD PROBABLY NOT PUT IT UNDER THIS HEADING",
+        "hypothesis": "So maybe, I mean we should we should definitely well we could probably not put it under this heading",
+        "norm_wer": 0.1364,
+        "norm_cer": 0.0833,
+        "elapsed_s": 15.1
+      },
+      {
+        "file": "ami_wer_07.flac",
+        "reference": "SO THE SUMMARY AND THE TOPIC AND THE TRANSCRIPT ARE UM SO UM OR WE COULD JUST PUT THEM ALL INTO ONE RESULT PANE ON THAT SAME WINDOW AND JUST INDICATE",
+        "hypothesis": "So the summary and the topic and the transcript for so Or we could just put them all into one result pane. On that same window. And just indicate",
+        "norm_wer": 0.0968,
+        "norm_cer": 0.0612,
+        "elapsed_s": 13.38
+      },
+      {
+        "file": "ami_wer_08.flac",
+        "reference": "I JUST SAID I SAID WHAT I'VE DONE SO FAR AND WHAT I'M GONNA DO AND SOME PRO SOME ISSUES",
+        "hypothesis": "I just said what I've done so far and what I'm gonna do. And some pr some issues.",
+        "norm_wer": 0.15,
+        "norm_cer": 0.0941,
+        "elapsed_s": 14.38
+      },
+      {
+        "file": "ami_wer_09.flac",
+        "reference": "I THINK IT UM ONE THING THAT WE COULD PROBABLY SKIP UH TOTALLY IS THE REMOVING THINGS FROM THE AUDIO FILES",
+        "hypothesis": "I think one thing that we could probably skip totally is the removing things from the audio files.",
+        "norm_wer": 0.1429,
+        "norm_cer": 0.0865,
+        "elapsed_s": 15.05
+      }
+    ]
+  }
+}
