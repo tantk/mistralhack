@@ -33,14 +33,22 @@ use reqwest;
 pub struct AppState {
     pub jobs: JobStore,
     pub voiceprints: SharedVoiceprintStore,
+    pub gpu_health: GpuHealthCache,
 }
 
 // ─── Router ─────────────────────────────────────────────────────────
 
 pub fn router(voiceprint_store: SharedVoiceprintStore) -> Router {
+    let gpu_health = GpuHealthCache::new();
+    {
+        let gh = gpu_health.clone();
+        tokio::spawn(async move { gh.warm().await });
+    }
+
     let state = AppState {
         jobs: Arc::new(RwLock::new(std::collections::HashMap::new())),
         voiceprints: voiceprint_store,
+        gpu_health,
     };
 
     Router::new()
@@ -108,7 +116,8 @@ async fn create_job(
     tracing::info!(job_id = %job_id, bytes = audio_bytes.len(), attendees = attendees.len(), "Job created");
 
     let voiceprints = state.voiceprints.clone();
-    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone(), attendees, voiceprints));
+    let gpu_health = state.gpu_health.clone();
+    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone(), attendees, voiceprints, gpu_health));
 
     Ok(Json(serde_json::json!({ "job_id": job_id })))
 }
@@ -146,6 +155,15 @@ async fn enroll_speaker(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    if !state.gpu_health.is_available().await {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({
+                "error": "GPU service unavailable — speaker enrollment requires GPU for embedding extraction"
+            }).to_string(),
+        ));
+    }
+
     let mut audio_bytes: Option<Vec<u8>> = None;
     let mut name: Option<String> = None;
 

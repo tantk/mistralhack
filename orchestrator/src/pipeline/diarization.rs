@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use super::types::*;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct DiarSegment {
     pub speaker: String,
     pub start: f64,
@@ -34,6 +34,73 @@ pub async fn call_diarize(audio: &[u8]) -> anyhow::Result<Vec<DiarSegment>> {
     let segments: Vec<DiarSegment> = serde_json::from_value(data["segments"].clone())?;
 
     Ok(segments)
+}
+
+/// Fallback diarization via Mistral API with `diarize=true`.
+/// Discards transcript text (we already have it from Phase 1).
+pub async fn call_mistral_diarize(audio: &[u8], api_key: &str) -> anyhow::Result<Vec<DiarSegment>> {
+    let client = reqwest::Client::new();
+    let part = reqwest::multipart::Part::bytes(audio.to_vec())
+        .file_name("meeting.wav")
+        .mime_str("audio/wav")?;
+    let form = reqwest::multipart::Form::new()
+        .part("file", part)
+        .text("model", "voxtral-mini-latest")
+        .text("response_format", "verbose_json")
+        .text("timestamp_granularities[]", "segment")
+        .text("diarize", "true");
+
+    let resp = client
+        .post("https://api.mistral.ai/v1/audio/transcriptions")
+        .header("Authorization", format!("Bearer {api_key}"))
+        .multipart(form)
+        .timeout(Duration::from_secs(300))
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Mistral diarize returned {status}: {body}");
+    }
+
+    let data: serde_json::Value = resp.json().await?;
+    tracing::debug!("Mistral diarize raw response: {}", serde_json::to_string_pretty(&data).unwrap_or_default());
+
+    let segments = data["segments"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("No segments array in Mistral diarize response"))?;
+
+    let mut diar_segments = Vec::new();
+    for seg in segments {
+        let start = seg["start"].as_f64().unwrap_or(0.0);
+        let end = seg["end"].as_f64().unwrap_or(0.0);
+
+        // Handle speaker_id as either integer or string
+        // Mistral API returns "speaker_1", "speaker_2" etc. — normalize to "SPEAKER_00" format
+        let speaker = if let Some(id) = seg["speaker_id"].as_u64() {
+            format!("SPEAKER_{:02}", id)
+        } else if let Some(id_str) = seg["speaker_id"].as_str() {
+            if id_str.starts_with("SPEAKER_") {
+                id_str.to_string()
+            } else if let Some(num_str) = id_str.strip_prefix("speaker_") {
+                if let Ok(n) = num_str.parse::<u64>() {
+                    format!("SPEAKER_{:02}", n)
+                } else {
+                    format!("SPEAKER_{}", num_str)
+                }
+            } else {
+                format!("SPEAKER_{}", id_str)
+            }
+        } else {
+            "SPEAKER_00".to_string()
+        };
+
+        diar_segments.push(DiarSegment { speaker, start, end });
+    }
+
+    tracing::info!(segments = diar_segments.len(), "Mistral API diarization complete");
+    Ok(diar_segments)
 }
 
 // ─── Drift detection ─────────────────────────────────────────────

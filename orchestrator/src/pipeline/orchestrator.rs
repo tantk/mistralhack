@@ -6,9 +6,10 @@ use tokio::sync::{broadcast, RwLock};
 use super::agent::run_agent;
 use super::alignment::{align_transcript, basic_align};
 use super::analysis::{call_analysis, compute_meeting_dynamics};
-use super::diarization::{align_words_to_speakers, call_diarize, group_into_segments, DiarSegment};
+use super::diarization::{align_words_to_speakers, call_diarize, call_mistral_diarize, group_into_segments, DiarSegment};
 use super::transcription::call_mistral_transcribe;
 use super::types::*;
+use super::types::GpuHealthCache;
 use super::voiceprint::SharedVoiceprintStore;
 
 pub async fn run_pipeline(
@@ -18,6 +19,7 @@ pub async fn run_pipeline(
     job_id: String,
     attendees: Vec<String>,
     voiceprint_store: SharedVoiceprintStore,
+    gpu_health: GpuHealthCache,
 ) {
     tracing::info!(job_id = %job_id, "Pipeline starting");
 
@@ -54,9 +56,19 @@ pub async fn run_pipeline(
     let diar_segments = match call_diarize(&audio_bytes).await {
         Ok(segs) => segs,
         Err(e) => {
-            tracing::error!(job_id = %job_id, "Diarization failed: {e}");
-            set_error(&result, &tx, &format!("Diarization failed: {e}")).await;
-            return;
+            tracing::warn!(job_id = %job_id, "GPU diarization failed: {e}, trying Mistral API fallback");
+            let api_key = mistral_api_key();
+            if api_key.is_empty() {
+                set_error(&result, &tx, &format!("Diarization failed: GPU unavailable, no MISTRAL_API_KEY for fallback")).await;
+                return;
+            }
+            match call_mistral_diarize(&audio_bytes, &api_key).await {
+                Ok(segs) => segs,
+                Err(e2) => {
+                    set_error(&result, &tx, &format!("Diarization failed: GPU ({e}) and Mistral API ({e2}) both failed")).await;
+                    return;
+                }
+            }
         }
     };
 
@@ -87,7 +99,8 @@ pub async fn run_pipeline(
     });
     result.write().await.phase = Some("acoustic_matching".into());
 
-    let acoustic_matches =
+    let gpu_available = gpu_health.check_now().await;
+    let acoustic_matches = if gpu_available {
         match proactive_acoustic_match(&audio_bytes, &diar_segments, &job_id, &voiceprint_store).await {
             Ok(matches) => {
                 tracing::info!(
@@ -104,7 +117,11 @@ pub async fn run_pipeline(
                 );
                 Vec::new()
             }
-        };
+        }
+    } else {
+        tracing::info!(job_id = %job_id, "Skipping acoustic matching (GPU unavailable)");
+        Vec::new()
+    };
 
     let _ = tx.send(PipelineEvent::AcousticMatchesComplete {
         matches: acoustic_matches.clone(),
@@ -116,8 +133,9 @@ pub async fn run_pipeline(
     });
     result.write().await.phase = Some("resolving".into());
 
+    let gpu_available = gpu_health.check_now().await;
     let (resolved_segments, agent_action_items) =
-        match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees, &voiceprint_store).await {
+        match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees, &voiceprint_store, gpu_available).await {
             Ok((segs, items)) => (segs, items),
             Err(e) => {
                 tracing::warn!(job_id = %job_id, "Agent resolution failed, applying threshold fallback: {e}");

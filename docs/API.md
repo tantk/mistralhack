@@ -480,6 +480,20 @@ The orchestrator runs a 4-phase pipeline:
 | `resolving`    | Mistral Large (agentic loop) | Multi-turn tool-calling to resolve speaker identities |
 | `analyzing`    | Mistral Large | Extract decisions, ambiguities, action items |
 
+### Degraded Mode (No GPU)
+
+When the GPU service is unavailable, the pipeline degrades gracefully instead of failing:
+
+| Feature | With GPU | Without GPU |
+|---------|----------|-------------|
+| Transcription | GPU Voxtral or Mistral API | Mistral API (unchanged) |
+| Diarization | Pyannote (GPU) | Mistral API `diarize=true` (lower quality) |
+| Acoustic matching | ERes2NetV2 embeddings | Skipped |
+| Speaker enrollment | Available | Returns 503 |
+| Agent resolution | Semantic + acoustic | Semantic only |
+
+GPU health is checked per-phase with a 60s cache TTL and 15min inactivity reset. Each pipeline phase independently adapts to GPU state changes (recovery or failure mid-pipeline).
+
 ### Agent Tools (resolving phase)
 
 The Mistral agent has access to 5 tools during speaker resolution:

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, RwLock};
+use std::time::Instant;
 
 // ─── Config ─────────────────────────────────────────────────────────
 
@@ -14,6 +15,79 @@ pub fn diarization_url() -> String {
 
 pub fn mistral_api_key() -> String {
     env::var("MISTRAL_API_KEY").unwrap_or_default()
+}
+
+// ─── GPU Health Cache ───────────────────────────────────────────────
+
+struct GpuHealthInner {
+    available: bool,
+    last_checked: Instant,
+    last_request: Instant,
+}
+
+#[derive(Clone)]
+pub struct GpuHealthCache {
+    inner: Arc<RwLock<GpuHealthInner>>,
+}
+
+impl GpuHealthCache {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(GpuHealthInner {
+                available: false,
+                last_checked: Instant::now() - Duration::from_secs(120), // force stale
+                last_request: Instant::now() - Duration::from_secs(1200),
+            })),
+        }
+    }
+
+    /// Returns cached GPU availability. Spawns background refresh if stale
+    /// (>60s since check OR >15min since last request).
+    pub async fn is_available(&self) -> bool {
+        let mut inner = self.inner.write().await;
+        inner.last_request = Instant::now();
+        let stale = inner.last_checked.elapsed() > Duration::from_secs(60)
+            || inner.last_request.elapsed() > Duration::from_secs(900);
+        let cached = inner.available;
+        drop(inner);
+
+        if stale {
+            let cache = self.clone();
+            tokio::spawn(async move { cache.refresh().await });
+        }
+
+        cached
+    }
+
+    /// Synchronous fresh health check. Calls GPU /health with 5s timeout,
+    /// updates cache, returns result.
+    pub async fn check_now(&self) -> bool {
+        let url = format!("{}/health", diarization_url());
+        let result = reqwest::Client::new()
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
+
+        let mut inner = self.inner.write().await;
+        inner.available = result;
+        inner.last_checked = Instant::now();
+        inner.last_request = Instant::now();
+
+        result
+    }
+
+    /// Fire-and-forget variant of check_now.
+    pub async fn refresh(&self) {
+        let _ = self.check_now().await;
+    }
+
+    /// One-shot refresh for startup.
+    pub async fn warm(&self) {
+        self.refresh().await;
+    }
 }
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -218,4 +292,5 @@ pub struct ToolContext {
     pub action_items: Vec<ActionItemRich>,
     pub diarization_url: String,
     pub voiceprint_store: super::voiceprint::SharedVoiceprintStore,
+    pub gpu_available: bool,
 }

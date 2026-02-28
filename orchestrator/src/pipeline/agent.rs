@@ -130,8 +130,13 @@ fn build_user_message(
     segments: &[Segment],
     acoustic_matches: &[AcousticMatch],
     attendees: &[String],
+    gpu_available: bool,
 ) -> String {
     let mut parts: Vec<String> = Vec::new();
+
+    if !gpu_available {
+        parts.push("## Note\nGPU service is unavailable. The `request_reanalysis` tool will not work. Rely on semantic evidence only (self-introductions, direct address, role references, attendee list).".to_string());
+    }
 
     // Known attendees
     if !attendees.is_empty() {
@@ -217,6 +222,10 @@ async fn execute_tool(
         }
 
         "request_reanalysis" => {
+            if !ctx.gpu_available {
+                return "Voiceprint identification unavailable: GPU service is down. Use semantic evidence (self-introductions, direct address, role references) to resolve speakers.".to_string();
+            }
+
             let start = args["start_time"].as_f64().unwrap_or(0.0);
             let end = args["end_time"].as_f64().unwrap_or(0.0);
 
@@ -360,6 +369,7 @@ pub async fn run_agent(
     acoustic_matches: &[AcousticMatch],
     attendees: &[String],
     voiceprint_store: &SharedVoiceprintStore,
+    gpu_available: bool,
 ) -> anyhow::Result<(Vec<Segment>, Vec<ActionItemRich>)> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
@@ -375,9 +385,10 @@ pub async fn run_agent(
         action_items: Vec::new(),
         diarization_url: diarization_url(),
         voiceprint_store: voiceprint_store.clone(),
+        gpu_available,
     };
 
-    let user_message = build_user_message(segments, acoustic_matches, attendees);
+    let user_message = build_user_message(segments, acoustic_matches, attendees, gpu_available);
 
     let tools = build_tool_schemas();
     let system_prompt = build_agent_system_prompt();
