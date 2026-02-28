@@ -18,9 +18,9 @@
 │  LAN: 192.168.0.121  |  Tailscale: 100.121.213.25                    │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────┐      │
-│  │  nuc-server (FastAPI + Uvicorn)                            │      │
+│  │  server (FastAPI + Uvicorn)                            │      │
 │  │  Port: 8000                                                │      │
-│  │  systemd: nuc-server.service (user)                        │      │
+│  │  systemd: server.service (user)                        │      │
 │  │                                                            │      │
 │  │  Endpoints:                                                │      │
 │  │    GET  /                     → Web UI (static)            │      │
@@ -82,7 +82,7 @@ Tailscale Funnel (tan.tail2e1adb.ts.net)
   │
   │  HTTP → localhost:8000
   ▼
-NUC FastAPI (nuc-server)
+NUC FastAPI (server)
   │
   │  HTTP POST /transcribe  (multipart)
   ▼
@@ -129,14 +129,14 @@ titan (GPU)
 
 | Service | Type | Port | Command |
 |---------|------|------|---------|
-| nuc-server | systemd user service | 8000 | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
+| server | systemd user service | 8000 | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
 | Tailscale Funnel | tailscale config | 443→8000 | `tailscale funnel --bg 8000` |
 
 ```bash
 # Manage NUC server
-systemctl --user status nuc-server
-systemctl --user restart nuc-server
-journalctl --user -u nuc-server -f
+systemctl --user status server
+systemctl --user restart server
+journalctl --user -u server -f
 
 # Manage funnel
 tailscale funnel status
@@ -153,7 +153,7 @@ tailscale funnel --https=443 off  # disable
 
 ## Configuration
 
-### NUC `.env` (nuc-server/.env)
+### NUC `.env` (server/.env)
 
 ```bash
 # titan - Windows GPU machine

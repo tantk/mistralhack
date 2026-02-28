@@ -11,6 +11,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "meetings.db")
 AUDIO_STORAGE_PATH = Path(os.getenv("AUDIO_STORAGE_PATH", "audio_storage"))
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 VOICEPRINT_STORE_PATH = Path(os.getenv("VOICEPRINT_STORE_PATH", "voiceprint_store"))
+API_KEY = os.getenv("API_KEY", "")
 
 AUDIO_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 VOICEPRINT_STORE_PATH.mkdir(parents=True, exist_ok=True)

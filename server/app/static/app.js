@@ -14,11 +14,40 @@ function showView(view) {
   view.classList.add("active");
 }
 
+// ---- Auth helpers ----
+function getApiKey() {
+  return localStorage.getItem("apiKey") || "";
+}
+
+function promptApiKey() {
+  const key = prompt("Enter API key:");
+  if (key) localStorage.setItem("apiKey", key);
+  return key || "";
+}
+
+document.getElementById("btn-api-key").addEventListener("click", (e) => {
+  e.preventDefault();
+  promptApiKey();
+});
+
 // ---- API helpers ----
 async function api(method, path, body) {
-  const opts = { method, headers: { "Content-Type": "application/json" } };
+  const key = getApiKey();
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    },
+  };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`/api${path}`, opts);
+
+  if (res.status === 401) {
+    promptApiKey();
+    return api(method, path, body); // retry once with new key
+  }
+
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -79,7 +108,9 @@ function startLiveTranscription(meetingId, title) {
 
   // WebSocket
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${proto}//${location.host}/ws/transcribe/${meetingId}`);
+  const wsToken = getApiKey();
+  const wsQuery = wsToken ? `?token=${encodeURIComponent(wsToken)}` : "";
+  ws = new WebSocket(`${proto}//${location.host}/ws/transcribe/${meetingId}${wsQuery}`);
 
   ws.onopen = () => {
     document.getElementById("live-status").textContent = "Connected. Speak now.";

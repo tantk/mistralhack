@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
+from app.auth import APIKeyMiddleware
 from app.database import init_db
 from app.routers import meetings, transcribe, pipeline, enrollment
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Meeting Minutes", lifespan=lifespan)
+app.add_middleware(APIKeyMiddleware)
 
 
 @app.middleware("http")
