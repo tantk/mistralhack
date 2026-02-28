@@ -11,7 +11,7 @@ PYANNOTE_MIN_SPEAKERS = int(os.getenv("PYANNOTE_MIN_SPEAKERS", "1"))
 PYANNOTE_MAX_SPEAKERS = int(os.getenv("PYANNOTE_MAX_SPEAKERS", "10"))
 
 # Speaker embeddings
-EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "speechbrain")  # "speechbrain" or "funasr"
+EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "funasr")  # "speechbrain" or "funasr"
 SPEECHBRAIN_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 SPEECHBRAIN_CACHE = "gpu_service/data/speechbrain_cache"
 FUNASR_MODEL = "iic/speech_eres2netv2_sv_zh-cn_16k-common"
