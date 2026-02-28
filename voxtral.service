@@ -1,0 +1,17 @@
+[Unit]
+Description=Voxtral Speech-to-Text Server
+After=network.target
+
+[Service]
+Type=simple
+User=titan
+WorkingDirectory=/mnt/c/dev/mistralhack
+Environment=PATH=/usr/local/cuda-12.6/bin:/usr/bin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64
+Environment=CUDA_COMPUTE_CAP=89
+ExecStart=/mnt/c/dev/mistralhack/target/debug/mistralhack --model-path ./models/Voxtral-Mini-4B-Realtime-2602 --quant none serve
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
