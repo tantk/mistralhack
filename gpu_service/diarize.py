@@ -13,15 +13,16 @@ _pipeline: PyannotePipeline | None = None
 
 
 def get_pipeline() -> PyannotePipeline:
-    """Lazy-load pyannote pipeline. Downloads model on first call."""
+    """Lazy-load pyannote pipeline. Downloads model on first call. Requires CUDA."""
     global _pipeline
     if _pipeline is None:
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA not available — GPU service requires a GPU, refusing to fall back to CPU")
         _pipeline = PyannotePipeline.from_pretrained(
             PYANNOTE_MODEL,
             token=HF_TOKEN,
         )
-        if torch.cuda.is_available():
-            _pipeline = _pipeline.to(torch.device("cuda"))
+        _pipeline = _pipeline.to(torch.device("cuda"))
     return _pipeline
 
 

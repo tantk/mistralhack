@@ -16,6 +16,10 @@ SPEECHBRAIN_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 SPEECHBRAIN_CACHE = "gpu_service/data/speechbrain_cache"
 FUNASR_MODEL = "iic/speech_campplus_sv_zh-cn_16k-common"
 
+# Voxtral transcription
+VOXTRAL_MODEL_ID = os.getenv("VOXTRAL_MODEL_ID", "mistralai/Voxtral-Mini-4B-Realtime-2602")
+VOXTRAL_LOCAL_PATH = os.getenv("VOXTRAL_LOCAL_PATH", "models/Voxtral-Mini-4B-Realtime-2602")
+
 # Audio
 TARGET_SAMPLE_RATE = 16000
 MIN_SEGMENT_DURATION_SEC = 0.5

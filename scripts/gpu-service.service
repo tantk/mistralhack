@@ -1,5 +1,5 @@
 [Unit]
-Description=GPU Diarization & Embedding Service
+Description=GPU Diarization, Embedding & Transcription Service
 After=network.target
 
 [Service]

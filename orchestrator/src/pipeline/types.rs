@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, RwLock};
 // ─── Config ─────────────────────────────────────────────────────────
 
 pub fn voxtral_url() -> String {
-    env::var("VOXTRAL_URL").unwrap_or_else(|_| "http://192.168.0.105:8080".into())
+    env::var("VOXTRAL_URL").unwrap_or_else(|_| "http://192.168.0.105:8001".into())
 }
 
 pub fn diarization_url() -> String {
