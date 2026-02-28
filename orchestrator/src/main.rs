@@ -1,4 +1,4 @@
-mod jobs;
+mod pipeline;
 
 use std::{env, net::SocketAddr};
 
@@ -7,8 +7,10 @@ use axum::{
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Json},
+    Router,
 };
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
 
 async fn auth(req: Request<Body>, next: Next) -> impl IntoResponse {
@@ -72,8 +74,17 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = jobs::router()
-        .layer(middleware::from_fn(auth))
+    // Auth only gates /api/ routes (not static files)
+    let api = pipeline::router()
+        .layer(middleware::from_fn(auth));
+
+    // Static file serving for frontend (SPA fallback to index.html)
+    let static_service = ServeDir::new("static")
+        .not_found_service(ServeFile::new("static/index.html"));
+
+    let app = Router::new()
+        .merge(api)
+        .fallback_service(static_service)
         .layer(cors);
 
     let api_key = env::var("API_KEY").unwrap_or_default();
@@ -83,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("API key auth enabled");
     }
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
     tracing::info!("Orchestrator listening on http://{addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
