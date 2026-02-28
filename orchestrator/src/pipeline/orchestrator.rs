@@ -263,7 +263,7 @@ async fn proactive_acoustic_match(
                     }
 
                     // Step 2: Local voiceprint store lookup
-                    match voiceprint_store.identify(&embedding, 3).await {
+                    match voiceprint_store.identify(&embedding, 3) {
                         Ok(vp_matches) => {
                             if let Some(best) = vp_matches.first() {
                                 matches.push(AcousticMatch {

@@ -217,7 +217,6 @@ async fn enroll_speaker(
     let speaker_id = state
         .voiceprints
         .enroll(&name, &embedding)
-        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Voiceprint enroll failed: {e}")))?;
 
     Ok(Json(serde_json::json!({
@@ -232,7 +231,6 @@ async fn list_speakers(
     let speakers = state
         .voiceprints
         .list_speakers()
-        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Voiceprint list failed: {e}")))?;
 
     Ok(Json(serde_json::json!({ "speakers": speakers })))
