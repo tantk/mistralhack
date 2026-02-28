@@ -51,6 +51,23 @@ export type Decision = z.infer<typeof DecisionSchema>
 export type Ambiguity = z.infer<typeof AmbiguitySchema>
 export type AnalysisResult = z.infer<typeof AnalysisCompleteSchema>
 
+// ─── Auth helpers ───────────────────────────────────────────────────────────
+
+export function getApiKey(): string {
+  return localStorage.getItem('apiKey') || ''
+}
+
+export function promptApiKey(): string {
+  const key = prompt('Enter API key:')
+  if (key) localStorage.setItem('apiKey', key)
+  return key || ''
+}
+
+function authHeaders(): Record<string, string> {
+  const key = getApiKey()
+  return key ? { Authorization: `Bearer ${key}` } : {}
+}
+
 // ─── API client ──────────────────────────────────────────────────────────────
 
 const BASE = '/api'
@@ -58,7 +75,15 @@ const BASE = '/api'
 export async function submitJob(file: File): Promise<string> {
   const form = new FormData()
   form.append('audio', file)
-  const res = await fetch(`${BASE}/jobs`, { method: 'POST', body: form })
+  const res = await fetch(`${BASE}/jobs`, {
+    method: 'POST',
+    body: form,
+    headers: authHeaders(),
+  })
+  if (res.status === 401) {
+    promptApiKey()
+    return submitJob(file) // retry with new key
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
   const data = JobCreatedSchema.parse(await res.json())
   return data.job_id

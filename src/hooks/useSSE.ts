@@ -4,6 +4,8 @@ import {
   TranscriptCompleteSchema,
   DiarizationCompleteSchema,
   AnalysisCompleteSchema,
+  getApiKey,
+  authHeaders,
 } from '../api/client'
 
 /**
@@ -27,7 +29,9 @@ export function useSSE(jobId: string | null) {
   useEffect(() => {
     if (!jobId) return
 
-    const es = new EventSource(`/api/jobs/${jobId}/events`)
+    const token = getApiKey()
+    const query = token ? `?token=${encodeURIComponent(token)}` : ''
+    const es = new EventSource(`/api/jobs/${jobId}/events${query}`)
     esRef.current = es
 
     es.addEventListener('phase_start', (e) => {
@@ -72,7 +76,9 @@ export function useSSE(jobId: string | null) {
   function startPolling(id: string) {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/jobs/${id}/result`)
+        const res = await fetch(`/api/jobs/${id}/result`, {
+          headers: authHeaders(),
+        })
         if (!res.ok) return
         const data = await res.json()
 
