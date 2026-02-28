@@ -13,13 +13,20 @@ type PhaseId = typeof PHASES[number]['id']
 
 const PHASE_ORDER: PhaseId[] = ['transcribing', 'diarizing', 'resolving', 'analyzing']
 
+// acoustic_matching is a sub-phase of diarizing — map it so the UI stays on "diarizing"
+function normalizePhase(phase: string | null): PhaseId | null {
+  if (phase === 'acoustic_matching') return 'diarizing'
+  return phase as PhaseId | null
+}
+
 export default function Processing() {
   const { jobId, phase, transcript, toolCalls, speakerResolutions } = useStore()
 
   // Connect SSE (or fallback poll) for this job
   useSSE(jobId)
 
-  const currentIndex = phase ? PHASE_ORDER.indexOf(phase) : -1
+  const displayPhase = normalizePhase(phase)
+  const currentIndex = displayPhase ? PHASE_ORDER.indexOf(displayPhase) : -1
 
   // Show last 5 tool calls for agent activity panel
   const recentToolCalls = toolCalls.slice(-5)
