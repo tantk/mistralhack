@@ -1,0 +1,16 @@
+target/
+node_modules/
+.venv/
+venv/
+.env
+data/
+*.wav
+*.db
+dist/
+.git/
+.claude/
+archive/
+gpu_service/
+test_server/
+models/
+hf_cache/

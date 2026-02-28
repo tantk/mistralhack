@@ -10,6 +10,7 @@ import {
   getApiKey,
   authHeaders,
 } from '../api/client'
+import { getBackend } from '../api/backend'
 
 /**
  * Connects to GET /api/jobs/:id/events via SSE.
@@ -36,69 +37,79 @@ export function useSSE(jobId: string | null) {
   useEffect(() => {
     if (!jobId) return
 
-    const token = getApiKey()
-    const query = token ? `?token=${encodeURIComponent(token)}` : ''
-    const es = new EventSource(`/api/jobs/${jobId}/events${query}`)
-    esRef.current = es
+    let cancelled = false
 
-    es.addEventListener('phase_start', (e) => {
-      const { phase } = JSON.parse(e.data)
-      setPhase(phase)
-    })
+    async function connect() {
+      const base = await getBackend()
+      if (cancelled) return
 
-    es.addEventListener('transcript_token', (e) => {
-      const data = JSON.parse(e.data)
-      appendTranscript(data.token)
-    })
+      const token = getApiKey()
+      const query = token ? `?token=${encodeURIComponent(token)}` : ''
+      const es = new EventSource(`${base}/jobs/${jobId}/events${query}`)
+      esRef.current = es
 
-    es.addEventListener('transcript_complete', (e) => {
-      const data = TranscriptCompleteSchema.parse(JSON.parse(e.data))
-      setTranscript(data.text)
-      setWords(data.words)
-      if (data.language) setLanguage(data.language)
-    })
+      es.addEventListener('phase_start', (e) => {
+        const { phase } = JSON.parse(e.data)
+        setPhase(phase)
+      })
 
-    es.addEventListener('diarization_complete', (e) => {
-      const data = DiarizationCompleteSchema.parse(JSON.parse(e.data))
-      setSegments(data.segments)
-    })
+      es.addEventListener('transcript_token', (e) => {
+        const data = JSON.parse(e.data)
+        appendTranscript(data.token)
+      })
 
-    es.addEventListener('tool_call', (e) => {
-      const data = ToolCallSchema.parse(JSON.parse(e.data))
-      addToolCall(data)
-    })
+      es.addEventListener('transcript_complete', (e) => {
+        const data = TranscriptCompleteSchema.parse(JSON.parse(e.data))
+        setTranscript(data.text)
+        setWords(data.words)
+        if (data.language) setLanguage(data.language)
+      })
 
-    es.addEventListener('tool_result', (e) => {
-      const data = ToolResultSchema.parse(JSON.parse(e.data))
-      updateLastToolResult(data.tool, data.result)
-    })
+      es.addEventListener('diarization_complete', (e) => {
+        const data = DiarizationCompleteSchema.parse(JSON.parse(e.data))
+        setSegments(data.segments)
+      })
 
-    es.addEventListener('speaker_resolved', (e) => {
-      const data = SpeakerResolvedSchema.parse(JSON.parse(e.data))
-      addSpeakerResolution(data)
-    })
+      es.addEventListener('tool_call', (e) => {
+        const data = ToolCallSchema.parse(JSON.parse(e.data))
+        addToolCall(data)
+      })
 
-    es.addEventListener('analysis_complete', (e) => {
-      const data = AnalysisCompleteSchema.parse(JSON.parse(e.data))
-      setDecisions(data.decisions)
-      setAmbiguities(data.ambiguities)
-      setActionItems(data.action_items)
-      if (data.meeting_dynamics) setMeetingDynamics(data.meeting_dynamics)
-    })
+      es.addEventListener('tool_result', (e) => {
+        const data = ToolResultSchema.parse(JSON.parse(e.data))
+        updateLastToolResult(data.tool, data.result)
+      })
 
-    es.addEventListener('done', () => {
-      es.close()
-      setStage('results')
-      setPhase(null)
-    })
+      es.addEventListener('speaker_resolved', (e) => {
+        const data = SpeakerResolvedSchema.parse(JSON.parse(e.data))
+        addSpeakerResolution(data)
+      })
 
-    es.onerror = () => {
-      es.close()
-      startPolling(jobId)
+      es.addEventListener('analysis_complete', (e) => {
+        const data = AnalysisCompleteSchema.parse(JSON.parse(e.data))
+        setDecisions(data.decisions)
+        setAmbiguities(data.ambiguities)
+        setActionItems(data.action_items)
+        if (data.meeting_dynamics) setMeetingDynamics(data.meeting_dynamics)
+      })
+
+      es.addEventListener('done', () => {
+        es.close()
+        setStage('results')
+        setPhase(null)
+      })
+
+      es.onerror = () => {
+        es.close()
+        startPolling(jobId!, base)
+      }
     }
 
+    connect()
+
     return () => {
-      es.close()
+      cancelled = true
+      esRef.current?.close()
     }
   }, [
     jobId, setPhase, setTranscript, appendTranscript, setWords, setLanguage, setSegments,
@@ -106,10 +117,10 @@ export function useSSE(jobId: string | null) {
     addToolCall, updateLastToolResult, addSpeakerResolution, setStage,
   ])
 
-  function startPolling(id: string) {
+  function startPolling(id: string, base: string) {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/jobs/${id}/result`, {
+        const res = await fetch(`${base}/jobs/${id}/result`, {
           headers: authHeaders(),
         })
         if (!res.ok) return

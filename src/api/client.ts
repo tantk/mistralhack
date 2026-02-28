@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getBackend } from './backend'
 
 // ─── Zod schemas (validated at runtime boundaries) ──────────────────────────
 
@@ -117,12 +118,11 @@ export function authHeaders(): Record<string, string> {
 
 // ─── API client ──────────────────────────────────────────────────────────────
 
-const BASE = '/api'
-
 export async function submitJob(file: File): Promise<string> {
+  const base = await getBackend()
   const form = new FormData()
   form.append('audio', file)
-  const res = await fetch(`${BASE}/jobs`, {
+  const res = await fetch(`${base}/jobs`, {
     method: 'POST',
     body: form,
     headers: authHeaders(),

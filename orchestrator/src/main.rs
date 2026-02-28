@@ -8,6 +8,7 @@ use axum::{
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Json},
+    routing::get,
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
@@ -62,6 +63,10 @@ fn subtle_eq(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
+async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"status": "ok"}))
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
@@ -91,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
         .not_found_service(ServeFile::new("static/index.html"));
 
     let app = Router::new()
+        .route("/api/health", get(health_check))
         .merge(api)
         .fallback_service(static_service)
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB
@@ -103,7 +109,11 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("API key auth enabled");
     }
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    let port: u16 = env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(7860);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Orchestrator listening on http://{addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
