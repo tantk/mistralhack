@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS meeting_minutes (
+    meeting_id INTEGER PRIMARY KEY,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+);
 """
 
 
