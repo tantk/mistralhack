@@ -125,6 +125,63 @@ fn build_agent_system_prompt() -> String {
 7. Stop when all speakers are resolved or flagged, and all action items are extracted"#.to_string()
 }
 
+fn build_user_message(
+    segments: &[Segment],
+    acoustic_matches: &[AcousticMatch],
+    attendees: &[String],
+) -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    // Known attendees
+    if !attendees.is_empty() {
+        parts.push(format!("## Known attendees\n{}", attendees.join(", ")));
+    }
+
+    // Acoustic voiceprint matches
+    if !acoustic_matches.is_empty() {
+        parts.push("## Acoustic voiceprint matches".to_string());
+        for m in acoustic_matches {
+            let status = if m.confirmed { "CONFIRMED" } else { "tentative" };
+            parts.push(format!(
+                "- {} → {} (similarity: {:.3}, {})",
+                m.diarization_speaker, m.matched_name, m.cosine_similarity, status
+            ));
+        }
+    }
+
+    // Transcript segments
+    parts.push("## Transcript segments".to_string());
+    for s in segments {
+        let overlap_marker = if s.is_overlap { " [OVERLAP]" } else { "" };
+        let conf = if s.confidence < 0.8 {
+            format!(" [conf={:.2}]", s.confidence)
+        } else {
+            String::new()
+        };
+        parts.push(format!(
+            "[{:.1}s-{:.1}s] {}{}{}: {}",
+            s.start, s.end, s.speaker, conf, overlap_marker, s.text
+        ));
+    }
+
+    // Unique speaker labels summary
+    let mut labels: Vec<String> = segments
+        .iter()
+        .map(|s| s.speaker.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    labels.sort();
+    if !labels.is_empty() {
+        parts.push(format!(
+            "\n## Speaker labels to resolve: {}",
+            labels.join(", ")
+        ));
+    }
+
+    parts.join("\n")
+}
+
 async fn execute_tool(
     tool_name: &str,
     args: &serde_json::Value,
@@ -272,6 +329,8 @@ pub async fn run_agent(
     tx: &broadcast::Sender<PipelineEvent>,
     segments: &[Segment],
     audio_bytes: &[u8],
+    acoustic_matches: &[AcousticMatch],
+    attendees: &[String],
 ) -> anyhow::Result<(Vec<Segment>, Vec<ActionItemRich>)> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
@@ -288,21 +347,7 @@ pub async fn run_agent(
         diarization_url: diarization_url(),
     };
 
-    let segment_text: Vec<String> = segments
-        .iter()
-        .map(|s| {
-            let overlap_marker = if s.is_overlap { " [OVERLAP]" } else { "" };
-            format!(
-                "[{:.1}s-{:.1}s] {} (confidence: {:.2}){}: {}",
-                s.start, s.end, s.speaker, s.confidence, overlap_marker, s.text
-            )
-        })
-        .collect();
-
-    let user_message = format!(
-        "Analyze this speaker-attributed meeting transcript. Resolve speaker labels to real names and extract action items.\n\nSEGMENTS:\n{}",
-        segment_text.join("\n")
-    );
+    let user_message = build_user_message(segments, acoustic_matches, attendees);
 
     let tools = build_tool_schemas();
     let system_prompt = build_agent_system_prompt();
@@ -402,6 +447,25 @@ fn apply_resolutions(segments: &[Segment], ctx: &ToolContext) -> Vec<Segment> {
         merge_map.insert(b.clone(), a.clone());
     }
 
+    // Propagate resolutions through merges:
+    // If B is merged into A, and B has a resolution but A doesn't, copy B's resolution to A.
+    // If A is merged into B (reverse), same logic applies.
+    let mut effective_resolutions = ctx.resolutions.clone();
+    for (a, b) in &ctx.merges {
+        // b merges into a
+        if effective_resolutions.contains_key(b) && !effective_resolutions.contains_key(a) {
+            let mut res = effective_resolutions[b].clone();
+            res.diarization_speaker = a.clone();
+            res.evidence = format!("Propagated from merged {}: {}", b, res.evidence);
+            effective_resolutions.insert(a.clone(), res);
+        } else if effective_resolutions.contains_key(a) && !effective_resolutions.contains_key(b) {
+            let mut res = effective_resolutions[a].clone();
+            res.diarization_speaker = b.clone();
+            res.evidence = format!("Propagated from merge target {}: {}", a, res.evidence);
+            effective_resolutions.insert(b.clone(), res);
+        }
+    }
+
     segments
         .iter()
         .map(|seg| {
@@ -411,7 +475,7 @@ fn apply_resolutions(segments: &[Segment], ctx: &ToolContext) -> Vec<Segment> {
                 speaker = merged_into.clone();
             }
 
-            if let Some(resolution) = ctx.resolutions.get(&speaker) {
+            if let Some(resolution) = effective_resolutions.get(&speaker) {
                 speaker = resolution.resolved_name.clone();
             }
 

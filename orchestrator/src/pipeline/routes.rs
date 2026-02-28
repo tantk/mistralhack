@@ -23,6 +23,8 @@ use super::types::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use reqwest;
+
 // ─── Router ─────────────────────────────────────────────────────────
 
 pub fn router() -> Router {
@@ -32,6 +34,8 @@ pub fn router() -> Router {
         .route("/api/jobs", post(create_job))
         .route("/api/jobs/{id}/events", get(stream_job))
         .route("/api/jobs/{id}/result", get(poll_job))
+        .route("/api/speakers/enroll", post(enroll_speaker))
+        .route("/api/speakers", get(list_speakers))
         .with_state(store)
 }
 
@@ -42,15 +46,30 @@ async fn create_job(
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let mut audio_bytes = Vec::new();
+    let mut attendees: Vec<String> = Vec::new();
 
     while let Ok(Some(field)) = multipart.next_field().await {
-        if field.name() == Some("audio") {
-            audio_bytes = field
-                .bytes()
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-                .to_vec();
-            break;
+        match field.name() {
+            Some("audio") => {
+                audio_bytes = field
+                    .bytes()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+                    .to_vec();
+            }
+            Some("attendees") => {
+                let text = field
+                    .text()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+                // Parse as JSON array of strings
+                if let Ok(parsed) = serde_json::from_str::<Vec<String>>(&text) {
+                    attendees = parsed;
+                } else {
+                    tracing::warn!("Failed to parse attendees field as JSON array, ignoring");
+                }
+            }
+            _ => {}
         }
     }
 
@@ -72,9 +91,9 @@ async fn create_job(
     };
     store.write().await.insert(job_id.clone(), handle);
 
-    tracing::info!(job_id = %job_id, bytes = audio_bytes.len(), "Job created");
+    tracing::info!(job_id = %job_id, bytes = audio_bytes.len(), attendees = attendees.len(), "Job created");
 
-    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone()));
+    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone(), attendees));
 
     Ok(Json(serde_json::json!({ "job_id": job_id })))
 }
@@ -104,6 +123,105 @@ async fn poll_job(
         Some(h) => Json(h.result.read().await.clone()).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
+}
+
+// ─── Speaker enrollment proxy endpoints ─────────────────────────────
+
+async fn enroll_speaker(
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let mut audio_bytes: Option<Vec<u8>> = None;
+    let mut name: Option<String> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        match field.name() {
+            Some("audio") => {
+                audio_bytes = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+                        .to_vec(),
+                );
+            }
+            Some("name") => {
+                name = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
+                );
+            }
+            _ => {}
+        }
+    }
+
+    let audio_bytes =
+        audio_bytes.ok_or((StatusCode::BAD_REQUEST, "No audio field".to_string()))?;
+    let name = name.ok_or((StatusCode::BAD_REQUEST, "No name field".to_string()))?;
+
+    let gpu_url = diarization_url();
+    let client = reqwest::Client::new();
+
+    let part = reqwest::multipart::Part::bytes(audio_bytes)
+        .file_name("enroll.wav")
+        .mime_str("audio/wav")
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let form = reqwest::multipart::Form::new()
+        .part("audio", part)
+        .text("name", name.clone());
+
+    let resp = client
+        .post(format!("{}/voiceprint/enroll", gpu_url))
+        .multipart(form)
+        .timeout(Duration::from_secs(60))
+        .send()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("GPU service unreachable: {e}")))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("GPU enrollment returned {status}: {body}"),
+        ));
+    }
+
+    let data: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid GPU response: {e}")))?;
+
+    Ok(Json(data))
+}
+
+async fn list_speakers() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let gpu_url = diarization_url();
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .get(format!("{}/voiceprint/speakers", gpu_url))
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("GPU service unreachable: {e}")))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("GPU speakers returned {status}: {body}"),
+        ));
+    }
+
+    let data: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid GPU response: {e}")))?;
+
+    Ok(Json(data))
 }
 
 // ─── SSE stream adapter ────────────────────────────────────────────
@@ -173,6 +291,10 @@ fn event_to_sse(ev: &PipelineEvent) -> (&'static str, serde_json::Value) {
         PipelineEvent::DiarizationComplete { segments } => (
             "diarization_complete",
             serde_json::json!({ "segments": segments }),
+        ),
+        PipelineEvent::AcousticMatchesComplete { matches } => (
+            "acoustic_matches_complete",
+            serde_json::json!({ "matches": matches }),
         ),
         PipelineEvent::ToolCall { tool, args } => (
             "tool_call",

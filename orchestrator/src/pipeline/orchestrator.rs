@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{broadcast, RwLock};
 
 use super::agent::run_agent;
 use super::alignment::{align_transcript, basic_align};
 use super::analysis::{call_analysis, compute_meeting_dynamics};
-use super::diarization::{align_words_to_speakers, call_diarize, group_into_segments};
+use super::diarization::{align_words_to_speakers, call_diarize, group_into_segments, DiarSegment};
 use super::transcription::call_mistral_transcribe;
 use super::types::*;
 
@@ -13,6 +15,7 @@ pub async fn run_pipeline(
     result: Arc<RwLock<JobResult>>,
     audio_bytes: Vec<u8>,
     job_id: String,
+    attendees: Vec<String>,
 ) {
     tracing::info!(job_id = %job_id, "Pipeline starting");
 
@@ -76,6 +79,35 @@ pub async fn run_pipeline(
         segments: segments.clone(),
     });
 
+    // ── Phase 2.5: Proactive Acoustic Matching ──
+    let _ = tx.send(PipelineEvent::PhaseStart {
+        phase: "acoustic_matching".into(),
+    });
+    result.write().await.phase = Some("acoustic_matching".into());
+
+    let acoustic_matches =
+        match proactive_acoustic_match(&audio_bytes, &diar_segments, &job_id).await {
+            Ok(matches) => {
+                tracing::info!(
+                    job_id = %job_id,
+                    matches = matches.len(),
+                    "Acoustic matching complete"
+                );
+                matches
+            }
+            Err(e) => {
+                tracing::warn!(
+                    job_id = %job_id,
+                    "Acoustic matching failed, continuing without: {e}"
+                );
+                Vec::new()
+            }
+        };
+
+    let _ = tx.send(PipelineEvent::AcousticMatchesComplete {
+        matches: acoustic_matches.clone(),
+    });
+
     // ── Phase 3: Agent-based Speaker Resolution ──
     let _ = tx.send(PipelineEvent::PhaseStart {
         phase: "resolving".into(),
@@ -83,11 +115,14 @@ pub async fn run_pipeline(
     result.write().await.phase = Some("resolving".into());
 
     let (resolved_segments, agent_action_items) =
-        match run_agent(&tx, &segments, &audio_bytes).await {
+        match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees).await {
             Ok((segs, items)) => (segs, items),
             Err(e) => {
-                tracing::warn!(job_id = %job_id, "Agent resolution failed, using segments as-is: {e}");
-                (segments.clone(), Vec::new())
+                tracing::warn!(job_id = %job_id, "Agent resolution failed, applying threshold fallback: {e}");
+                // Threshold fallback: apply acoustic matches with similarity >= 0.85
+                let fallback_segments =
+                    apply_threshold_fallback(&segments, &acoustic_matches, &tx);
+                (fallback_segments, Vec::new())
             }
         };
 
@@ -116,6 +151,17 @@ pub async fn run_pipeline(
     // Compute meeting dynamics
     let meeting_dynamics = compute_meeting_dynamics(&resolved_segments);
 
+    // Build speakers array from resolved segments + acoustic matches
+    let speakers = build_speakers_array(&resolved_segments, &acoustic_matches);
+
+    // Build meeting metadata
+    let meeting_metadata = MeetingMetadata {
+        title: None,
+        date: None,
+        duration: Some(format!("{:.1}s", transcription.duration_ms as f64 / 1000.0)),
+        language: transcription.language.clone(),
+    };
+
     tracing::info!(
         job_id = %job_id,
         decisions = decisions.len(),
@@ -124,10 +170,15 @@ pub async fn run_pipeline(
         "Analysis complete"
     );
 
-    result.write().await.decisions = Some(decisions.clone());
-    result.write().await.ambiguities = Some(ambiguities.clone());
-    result.write().await.action_items = Some(action_items.clone());
-    result.write().await.meeting_dynamics = Some(meeting_dynamics.clone());
+    {
+        let mut r = result.write().await;
+        r.decisions = Some(decisions.clone());
+        r.ambiguities = Some(ambiguities.clone());
+        r.action_items = Some(action_items.clone());
+        r.meeting_dynamics = Some(meeting_dynamics.clone());
+        r.speakers = Some(speakers);
+        r.meeting_metadata = Some(meeting_metadata);
+    }
     let _ = tx.send(PipelineEvent::AnalysisComplete {
         decisions,
         ambiguities,
@@ -141,6 +192,199 @@ pub async fn run_pipeline(
     let _ = tx.send(PipelineEvent::Done);
 
     tracing::info!(job_id = %job_id, "Pipeline complete");
+}
+
+/// Proactive acoustic matching: for each unique diarization speaker, pick the
+/// longest segment as representative, call /voiceprint/identify, and return matches.
+async fn proactive_acoustic_match(
+    audio_bytes: &[u8],
+    diar_segments: &[DiarSegment],
+    job_id: &str,
+) -> anyhow::Result<Vec<AcousticMatch>> {
+    let diarization_base = diarization_url();
+
+    // Group diarization segments by speaker, pick the longest for each
+    let mut speaker_best: HashMap<String, &DiarSegment> = HashMap::new();
+    for seg in diar_segments {
+        let dur = seg.end - seg.start;
+        let is_longer = speaker_best
+            .get(&seg.speaker)
+            .map(|best| dur > (best.end - best.start))
+            .unwrap_or(true);
+        if is_longer {
+            speaker_best.insert(seg.speaker.clone(), seg);
+        }
+    }
+
+    let client = reqwest::Client::new();
+    let mut matches = Vec::new();
+
+    for (speaker_label, best_seg) in &speaker_best {
+        let duration_ms = ((best_seg.end - best_seg.start) * 1000.0) as i64;
+        if duration_ms < 500 {
+            tracing::debug!(
+                job_id = %job_id,
+                speaker = %speaker_label,
+                "Segment too short for embedding ({duration_ms}ms), skipping"
+            );
+            continue;
+        }
+
+        let part = reqwest::multipart::Part::bytes(audio_bytes.to_vec())
+            .file_name("audio.wav")
+            .mime_str("audio/wav")?;
+        let form = reqwest::multipart::Form::new()
+            .part("audio", part)
+            .text("start_time", best_seg.start.to_string())
+            .text("end_time", best_seg.end.to_string());
+
+        match client
+            .post(format!("{}/voiceprint/identify", diarization_base))
+            .multipart(form)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                if let Ok(data) = resp.json::<serde_json::Value>().await {
+                    if let Some(match_arr) = data["matches"].as_array() {
+                        if let Some(best) = match_arr.first() {
+                            let name = best["name"]
+                                .as_str()
+                                .unwrap_or("Unknown")
+                                .to_string();
+                            let similarity = best["similarity"].as_f64().unwrap_or(0.0);
+                            matches.push(AcousticMatch {
+                                diarization_speaker: speaker_label.clone(),
+                                matched_name: name,
+                                cosine_similarity: similarity,
+                                confirmed: similarity >= 0.85,
+                            });
+                        }
+                    }
+                }
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                tracing::warn!(
+                    job_id = %job_id,
+                    speaker = %speaker_label,
+                    "Voiceprint identify returned {status}"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    job_id = %job_id,
+                    speaker = %speaker_label,
+                    "Voiceprint identify failed: {e}"
+                );
+            }
+        }
+    }
+
+    Ok(matches)
+}
+
+/// Threshold fallback: when the agent fails, apply acoustic matches with
+/// cosine similarity >= 0.85 as automatic speaker resolutions.
+fn apply_threshold_fallback(
+    segments: &[Segment],
+    acoustic_matches: &[AcousticMatch],
+    tx: &broadcast::Sender<PipelineEvent>,
+) -> Vec<Segment> {
+    let mut fallback_map: HashMap<String, &AcousticMatch> = HashMap::new();
+    for m in acoustic_matches {
+        if m.cosine_similarity >= 0.85 {
+            fallback_map.insert(m.diarization_speaker.clone(), m);
+        }
+    }
+
+    if fallback_map.is_empty() {
+        return segments.to_vec();
+    }
+
+    tracing::info!(
+        resolved = fallback_map.len(),
+        "Applying threshold fallback for {} speakers",
+        fallback_map.len()
+    );
+
+    for m in fallback_map.values() {
+        let _ = tx.send(PipelineEvent::SpeakerResolved {
+            label: m.diarization_speaker.clone(),
+            name: m.matched_name.clone(),
+            confidence: m.cosine_similarity,
+            method: "threshold_fallback".to_string(),
+        });
+    }
+
+    segments
+        .iter()
+        .map(|seg| {
+            let speaker = if let Some(m) = fallback_map.get(&seg.speaker) {
+                m.matched_name.clone()
+            } else {
+                seg.speaker.clone()
+            };
+            Segment {
+                speaker,
+                start: seg.start,
+                end: seg.end,
+                text: seg.text.clone(),
+                is_overlap: seg.is_overlap,
+                confidence: seg.confidence,
+                active_speakers: seg.active_speakers.clone(),
+            }
+        })
+        .collect()
+}
+
+/// Build a speakers array from resolved segments and acoustic match data.
+fn build_speakers_array(
+    segments: &[Segment],
+    acoustic_matches: &[AcousticMatch],
+) -> Vec<SpeakerInfo> {
+    let mut seen: HashMap<String, SpeakerInfo> = HashMap::new();
+
+    // Build acoustic lookup
+    let acoustic_map: HashMap<String, &AcousticMatch> = acoustic_matches
+        .iter()
+        .map(|m| (m.diarization_speaker.clone(), m))
+        .collect();
+
+    for seg in segments {
+        if seen.contains_key(&seg.speaker) {
+            continue;
+        }
+
+        // Determine resolution method and acoustic confidence
+        let (acoustic_confidence, resolution_method) =
+            if let Some(m) = acoustic_map.get(&seg.speaker) {
+                (Some(m.cosine_similarity), "agent+acoustic".to_string())
+            } else {
+                // Check if speaker name looks resolved (not SPEAKER_XX pattern)
+                if seg.speaker.starts_with("SPEAKER_") {
+                    (None, "unresolved".to_string())
+                } else {
+                    (None, "agent".to_string())
+                }
+            };
+
+        seen.insert(
+            seg.speaker.clone(),
+            SpeakerInfo {
+                id: seg.speaker.clone(),
+                name: seg.speaker.clone(),
+                role: None,
+                acoustic_confidence,
+                resolution_method,
+            },
+        );
+    }
+
+    let mut speakers: Vec<SpeakerInfo> = seen.into_values().collect();
+    speakers.sort_by(|a, b| a.id.cmp(&b.id));
+    speakers
 }
 
 pub async fn set_error(

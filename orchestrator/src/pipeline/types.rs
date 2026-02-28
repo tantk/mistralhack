@@ -19,6 +19,36 @@ pub fn mistral_api_key() -> String {
 // ─── Types ──────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AcousticMatch {
+    pub diarization_speaker: String,
+    pub matched_name: String,
+    pub cosine_similarity: f64,
+    pub confirmed: bool, // similarity >= 0.85
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SpeakerInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    pub acoustic_confidence: Option<f64>,
+    pub resolution_method: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MeetingMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Word {
     pub word: String,
     pub start: f64,
@@ -126,6 +156,10 @@ pub enum PipelineEvent {
     },
     #[serde(rename = "diarization_complete")]
     DiarizationComplete { segments: Vec<Segment> },
+    #[serde(rename = "acoustic_matches_complete")]
+    AcousticMatchesComplete {
+        matches: Vec<AcousticMatch>,
+    },
     #[serde(rename = "tool_call")]
     ToolCall {
         tool: String,
@@ -167,6 +201,8 @@ pub struct JobResult {
     pub ambiguities: Option<Vec<Ambiguity>>,
     pub action_items: Option<Vec<ActionItemRich>>,
     pub meeting_dynamics: Option<MeetingDynamics>,
+    pub speakers: Option<Vec<SpeakerInfo>>,
+    pub meeting_metadata: Option<MeetingMetadata>,
     pub error: Option<String>,
 }
 
