@@ -3,8 +3,7 @@ Health check for all services.
 
 Checks:
   - NUC server (tan): https://tan.tail2e1adb.ts.net or http://192.168.0.121:8000
-  - Voxtral transcription (titan): http://192.168.0.105:8080/health
-  - GPU diarization (titan): http://192.168.0.105:8001/health
+  - GPU service (titan): http://192.168.0.105:8001/health (diarization, embeddings, transcription)
 """
 import os
 import json
@@ -18,13 +17,7 @@ SERVICES = [
         "expect_status": 200,
     },
     {
-        "name": "Voxtral Transcription (titan:8080)",
-        "url": os.environ.get("VOXTRAL_URL", "http://192.168.0.105:8080"),
-        "health_path": "/health",
-        "expect_json": True,
-    },
-    {
-        "name": "GPU Diarization (titan:8001)",
+        "name": "GPU Service (titan:8001) — diarization, embeddings, transcription",
         "url": os.environ.get("DIARIZATION_URL", "http://192.168.0.105:8001"),
         "health_path": "/health",
         "expect_json": True,

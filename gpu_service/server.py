@@ -1,4 +1,6 @@
+import asyncio
 import io
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -13,11 +15,13 @@ import torch
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from pydub import AudioSegment
+from sse_starlette.sse import EventSourceResponse
 
 from gpu_service.config import GPU_SERVICE_HOST, GPU_SERVICE_PORT, EMBEDDING_BACKEND
 from gpu_service.audio_utils import prepare_audio
 from gpu_service.diarize import diarize, get_pipeline
 from gpu_service.embeddings import extract_embedding, get_extractor
+from gpu_service.transcribe import get_model as get_transcription_model, transcribe, transcribe_stream
 from gpu_service.voiceprint_store import get_voiceprint_store
 
 logger = logging.getLogger("gpu_service")
@@ -27,19 +31,29 @@ logger = logging.getLogger("gpu_service")
 async def lifespan(app: FastAPI):
     logger.info("Pre-loading diarization pipeline...")
     get_pipeline()
-    logger.info("Diarization pipeline ready. Embedding extractor will lazy-load on first request.")
+    logger.info("Diarization pipeline ready.")
+    logger.info("Pre-loading Voxtral transcription model...")
+    get_transcription_model()
+    logger.info("Voxtral model ready. Embedding extractor will lazy-load on first request.")
     yield
 
 
-app = FastAPI(title="GPU Service", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="GPU Diarization, Embedding & Transcription Service", version="0.2.0", lifespan=lifespan)
 
 
 @app.get("/health")
 async def health():
+    from gpu_service.config import VOXTRAL_MODEL_ID
+    if not torch.cuda.is_available():
+        return JSONResponse(status_code=503, content={
+            "status": "error",
+            "error": "CUDA not available — GPU required",
+        })
     return {
         "status": "ok",
-        "gpu_available": torch.cuda.is_available(),
+        "gpu_available": True,
         "embedding_backend": EMBEDDING_BACKEND,
+        "transcription_model": VOXTRAL_MODEL_ID,
     }
 
 
@@ -135,6 +149,87 @@ async def voiceprint_speakers():
     except Exception as e:
         logger.exception("Voiceprint list failed")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/transcribe")
+async def transcribe_endpoint(
+    audio: UploadFile = File(...),
+    prompt: str = Form("Transcribe this audio."),
+):
+    try:
+        raw = await audio.read()
+        audio_16k = prepare_audio(raw)
+        text = transcribe(audio_16k, prompt=prompt)
+        return {"text": text}
+    except Exception as e:
+        logger.exception("Transcription failed")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/transcribe/stream")
+async def transcribe_stream_endpoint(
+    audio: UploadFile = File(...),
+    prompt: str = Form("Transcribe this audio."),
+):
+    try:
+        raw = await audio.read()
+        audio_16k = prepare_audio(raw)
+    except Exception as e:
+        logger.exception("Audio preparation failed")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+        full_text = ""
+        try:
+            gen = transcribe_stream(audio_16k, prompt=prompt)
+            # Run the blocking generator in a thread
+            import queue
+            import threading
+
+            q = queue.Queue()
+            sentinel = object()
+
+            def _run():
+                try:
+                    for token in gen:
+                        q.put(token)
+                except Exception as exc:
+                    q.put(exc)
+                finally:
+                    q.put(sentinel)
+
+            thread = threading.Thread(target=_run, daemon=True)
+            thread.start()
+
+            while True:
+                item = await loop.run_in_executor(None, q.get)
+                if item is sentinel:
+                    break
+                if isinstance(item, Exception):
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({"error": str(item)}),
+                    }
+                    return
+                full_text += item
+                yield {
+                    "event": "token",
+                    "data": json.dumps({"token": item}),
+                }
+
+            yield {
+                "event": "done",
+                "data": json.dumps({"text": full_text.strip()}),
+            }
+        except Exception as e:
+            logger.exception("Streaming transcription failed")
+            yield {
+                "event": "error",
+                "data": json.dumps({"error": str(e)}),
+            }
+
+    return EventSourceResponse(event_generator())
 
 
 if __name__ == "__main__":
