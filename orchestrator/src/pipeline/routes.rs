@@ -19,6 +19,7 @@ use tokio::sync::broadcast;
 use uuid::Uuid;
 
 use super::orchestrator::run_pipeline;
+use super::transcription::transcribe_audio;
 use super::types::*;
 use super::voiceprint::SharedVoiceprintStore;
 use std::sync::Arc;
@@ -43,6 +44,7 @@ pub fn router(voiceprint_store: SharedVoiceprintStore) -> Router {
     };
 
     Router::new()
+        .route("/api/transcribe", post(transcribe))
         .route("/api/jobs", post(create_job))
         .route("/api/jobs/{id}/events", get(stream_job))
         .route("/api/jobs/{id}/result", get(poll_job))
@@ -234,6 +236,39 @@ async fn list_speakers(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Voiceprint list failed: {e}")))?;
 
     Ok(Json(serde_json::json!({ "speakers": speakers })))
+}
+
+// ─── Standalone transcription ───────────────────────────────────────
+
+async fn transcribe(
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let mut audio_bytes = Vec::new();
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        if field.name() == Some("audio") {
+            audio_bytes = field
+                .bytes()
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+                .to_vec();
+        }
+    }
+
+    if audio_bytes.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "No audio field".into()));
+    }
+
+    let result = transcribe_audio(&audio_bytes)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "text": result.text,
+        "words": result.words,
+        "language": result.language,
+        "duration_ms": result.duration_ms,
+    })))
 }
 
 // ─── SSE stream adapter ────────────────────────────────────────────

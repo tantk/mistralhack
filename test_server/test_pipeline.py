@@ -447,6 +447,64 @@ def validate_sse_events(events):
     return checks
 
 
+def test_transcribe_endpoint(audio_path):
+    """Test POST /api/transcribe — standalone transcription without full pipeline."""
+    print("\n--- Test: Standalone Transcribe ---")
+    with open(audio_path, "rb") as f:
+        resp = requests.post(
+            f"{SERVICE_URL}/api/transcribe",
+            files={"audio": f},
+            headers=auth_headers(),
+            timeout=120,
+        )
+
+    print(f"  Status: {resp.status_code}")
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
+    data = resp.json()
+
+    # Validate text
+    assert "text" in data, f"Response missing 'text': {data}"
+    assert isinstance(data["text"], str) and len(data["text"]) > 0, f"text is empty"
+    print(f"  Text: {data['text'][:80]}...")
+
+    # Validate words
+    assert "words" in data, f"Response missing 'words': {data}"
+    assert isinstance(data["words"], list), f"words is not a list: {type(data['words'])}"
+    if len(data["words"]) > 0:
+        w = data["words"][0]
+        for field in ["word", "start", "end"]:
+            assert field in w, f"word object missing '{field}': {w}"
+        print(f"  Words: {len(data['words'])} words (first: {w})")
+    else:
+        print("  Words: 0 (Voxtral fallback — no word timestamps)")
+
+    # Validate language
+    assert "language" in data, f"Response missing 'language': {data}"
+    print(f"  Language: {data['language']}")
+
+    # Validate duration_ms
+    assert "duration_ms" in data, f"Response missing 'duration_ms': {data}"
+    assert isinstance(data["duration_ms"], (int, float)), f"duration_ms not numeric"
+    print(f"  Duration: {data['duration_ms']}ms")
+
+    return data
+
+
+def test_transcribe_no_audio():
+    """Test POST /api/transcribe with no audio field — should return 400."""
+    print("\n--- Test: Transcribe (no audio) ---")
+    resp = requests.post(
+        f"{SERVICE_URL}/api/transcribe",
+        headers=auth_headers(),
+        timeout=10,
+    )
+    print(f"  Status: {resp.status_code}")
+    assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+    print("  Correctly rejected (400)")
+    return True
+
+
 def test_auth_rejection():
     """Test that auth is enforced when API_KEY is set."""
     if not API_KEY:
@@ -507,12 +565,28 @@ def main():
         print(f"  FAIL: {e}")
         all_results["tests"]["stream_not_found"] = f"FAIL: {e}"
 
-    # 3. Auth test
+    # 3. Standalone transcription tests
+    try:
+        test_transcribe_no_audio()
+        all_results["tests"]["transcribe_no_audio"] = "PASS"
+    except Exception as e:
+        print(f"  FAIL: {e}")
+        all_results["tests"]["transcribe_no_audio"] = f"FAIL: {e}"
+
+    try:
+        transcribe_result = test_transcribe_endpoint(audio_path)
+        all_results["tests"]["transcribe_endpoint"] = "PASS"
+        all_results["transcribe_result"] = transcribe_result
+    except Exception as e:
+        print(f"  FAIL: {e}")
+        all_results["tests"]["transcribe_endpoint"] = f"FAIL: {e}"
+
+    # 4. Auth test
     auth_result = test_auth_rejection()
     if auth_result is not None:
         all_results["tests"]["auth_rejection"] = "PASS" if auth_result else "FAIL"
 
-    # 4. Full pipeline test with SSE (creates job + connects SSE concurrently)
+    # 5. Full pipeline test with SSE (creates job + connects SSE concurrently)
     print("\n" + "=" * 70)
     print("Full Pipeline Test (SSE)")
     print("=" * 70)
@@ -532,7 +606,7 @@ def main():
         print(f"  FAIL: {e}")
         all_results["tests"]["sse_pipeline"] = f"FAIL: {e}"
 
-    # 5. Full pipeline test with polling
+    # 6. Full pipeline test with polling
     print("\n" + "=" * 70)
     print("Full Pipeline Test (Polling)")
     print("=" * 70)

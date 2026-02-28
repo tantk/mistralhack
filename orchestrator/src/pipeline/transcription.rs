@@ -3,13 +3,31 @@ use tokio::sync::broadcast;
 
 use super::types::*;
 
+/// Standalone transcription: Mistral API if key is set, else Voxtral non-streaming.
+/// No broadcast channel needed — suitable for the standalone `/api/transcribe` endpoint.
+pub async fn transcribe_audio(audio: &[u8]) -> anyhow::Result<TranscriptionResult> {
+    let api_key = mistral_api_key();
+    if api_key.is_empty() {
+        tracing::info!("No MISTRAL_API_KEY, falling back to self-hosted Voxtral (non-streaming)");
+        let text = call_voxtral_non_streaming(audio).await?;
+        return Ok(TranscriptionResult {
+            text,
+            words: Vec::new(),
+            language: None,
+            duration_ms: 0,
+        });
+    }
+
+    call_mistral_api(audio, &api_key).await
+}
+
+/// Pipeline transcription: tries Mistral API, falls back to Voxtral with token streaming.
 pub async fn call_mistral_transcribe(
     audio: &[u8],
     tx: &broadcast::Sender<PipelineEvent>,
 ) -> anyhow::Result<TranscriptionResult> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
-        // Fallback to self-hosted Voxtral (streaming tokens, no word timestamps)
         tracing::info!("No MISTRAL_API_KEY, falling back to self-hosted Voxtral");
         let text = call_voxtral(audio, tx).await?;
         return Ok(TranscriptionResult {
@@ -20,6 +38,23 @@ pub async fn call_mistral_transcribe(
         });
     }
 
+    match call_mistral_api(audio, &api_key).await {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            tracing::warn!("Mistral API transcription failed: {e}, falling back to Voxtral");
+            let text = call_voxtral(audio, tx).await?;
+            Ok(TranscriptionResult {
+                text,
+                words: Vec::new(),
+                language: None,
+                duration_ms: 0,
+            })
+        }
+    }
+}
+
+/// Call Mistral transcription API and parse the response.
+async fn call_mistral_api(audio: &[u8], api_key: &str) -> anyhow::Result<TranscriptionResult> {
     let client = reqwest::Client::new();
     let part = reqwest::multipart::Part::bytes(audio.to_vec())
         .file_name("audio.wav")
@@ -41,17 +76,7 @@ pub async fn call_mistral_transcribe(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        // Fallback to self-hosted on API error
-        tracing::warn!(
-            "Mistral transcription API returned {status}: {body}, falling back to Voxtral"
-        );
-        let text = call_voxtral(audio, tx).await?;
-        return Ok(TranscriptionResult {
-            text,
-            words: Vec::new(),
-            language: None,
-            duration_ms: 0,
-        });
+        anyhow::bail!("Mistral transcription API returned {status}: {body}");
     }
 
     let data: serde_json::Value = resp.json().await?;
@@ -176,7 +201,7 @@ pub async fn call_voxtral(
 }
 
 /// Non-streaming Voxtral fallback: POST /transcribe, returns {"text": "..."}
-async fn call_voxtral_non_streaming(audio: &[u8]) -> anyhow::Result<String> {
+pub(super) async fn call_voxtral_non_streaming(audio: &[u8]) -> anyhow::Result<String> {
     let client = reqwest::Client::new();
     let part = reqwest::multipart::Part::bytes(audio.to_vec())
         .file_name("audio.wav")
