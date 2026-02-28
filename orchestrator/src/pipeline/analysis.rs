@@ -5,7 +5,7 @@ use super::types::*;
 
 pub async fn call_analysis(
     segments: &[Segment],
-) -> anyhow::Result<(Vec<Decision>, Vec<Ambiguity>, Vec<ActionItemRich>)> {
+) -> anyhow::Result<(Vec<Decision>, Vec<Ambiguity>, Vec<ActionItemRich>, Option<String>, Option<String>)> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
         anyhow::bail!("MISTRAL_API_KEY not set");
@@ -51,10 +51,12 @@ Return a JSON object with exactly these fields:
       "deadline_mentioned": "<deadline if mentioned, or null>",
       "verbatim_quote": "<exact quote from transcript>"
     }}
-  ]
+  ],
+  "meeting_title": "<inferred topic or title of the meeting, or null if unclear>",
+  "meeting_date": "<ISO 8601 date if mentioned or inferrable, e.g. 2025-03-15, or null>"
 }}
 
-If none are found for a category, return an empty array."#,
+If none are found for a category, return an empty array. meeting_title and meeting_date may be null."#,
         transcript_lines.join("\n"),
     );
 
@@ -94,7 +96,10 @@ If none are found for a category, return an empty array."#,
     let action_items: Vec<ActionItemRich> =
         serde_json::from_value(parsed["action_items"].clone()).unwrap_or_default();
 
-    Ok((decisions, ambiguities, action_items))
+    let meeting_title = parsed["meeting_title"].as_str().map(|s| s.to_string());
+    let meeting_date = parsed["meeting_date"].as_str().map(|s| s.to_string());
+
+    Ok((decisions, ambiguities, action_items, meeting_title, meeting_date))
 }
 
 pub fn compute_meeting_dynamics(segments: &[Segment]) -> MeetingDynamics {

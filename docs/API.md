@@ -56,6 +56,48 @@ Create a processing job. Uploads audio and starts the full pipeline:
 
 ---
 
+### `POST /api/transcribe`
+
+Standalone transcription endpoint. Returns transcription results directly without running the full pipeline (no diarization, speaker resolution, or analysis). Useful for real-time transcription, testing, and lightweight integrations.
+
+Fallback chain: **GPU service → Mistral API → CPU** (self-hosted Voxtral on CPU, only if estimated processing time ≤ 1 minute). Returns an error if all backends fail or CPU processing would be too slow.
+
+**Request:** `multipart/form-data`
+
+| Field   | Type | Required | Description          |
+|---------|------|----------|----------------------|
+| `audio` | file | yes      | Audio file (WAV, FLAC, etc.) |
+
+**Response:** `200 OK`
+```json
+{
+  "text": "Hello world, this is a test.",
+  "words": [
+    {"word": "Hello", "start": 0.0, "end": 0.5},
+    {"word": "world,", "start": 0.5, "end": 0.9},
+    {"word": "this", "start": 1.0, "end": 1.2},
+    {"word": "is", "start": 1.2, "end": 1.3},
+    {"word": "a", "start": 1.3, "end": 1.4},
+    {"word": "test.", "start": 1.4, "end": 1.8}
+  ],
+  "language": "en",
+  "duration_ms": 1800
+}
+```
+
+| Field         | Type          | Description |
+|---------------|---------------|-------------|
+| `text`        | string        | Full transcript text |
+| `words`       | Word[]        | Word-level timestamps (populated via Mistral API; empty array if GPU/CPU was used) |
+| `language`    | string \| null | Detected language (populated via Mistral API; null if GPU/CPU was used) |
+| `duration_ms` | number        | Audio duration in milliseconds (populated via Mistral API; 0 if GPU/CPU was used) |
+
+**Errors:**
+- `400 Bad Request` — no `audio` field in multipart
+- `500 Internal Server Error` — transcription failed
+
+---
+
 ### `GET /api/jobs/{id}/events`
 
 SSE stream of pipeline events. Connect immediately after creating a job.
@@ -152,6 +194,7 @@ When `"complete"`, all fields are populated:
 - `ambiguities`: Ambiguity[] — flagged ambiguities
 - `action_items`: ActionItem[] — extracted action items
 - `meeting_dynamics`: MeetingDynamics — talk time and interruption stats
+- `meeting_metadata`: MeetingMetadata — title (inferred from content), date (ISO 8601 if mentioned), duration, language. `title` and `date` are populated when extractable from the conversation; otherwise `null`.
 - `error`: null
 
 When `"error"`, only `error` is populated with a message.
@@ -432,7 +475,7 @@ The orchestrator runs a 4-phase pipeline:
 
 | Phase          | Service              | Description |
 |----------------|----------------------|-------------|
-| `transcribing` | Mistral API (or self-hosted Voxtral) | Audio → text with word timestamps and language detection |
+| `transcribing` | Mistral API (or self-hosted Voxtral) | Audio → text with word timestamps and language detection. Audio >30 min is automatically chunked (25 min chunks, 30s overlap) — transparent to the client. |
 | `diarizing`    | GPU Service (Pyannote) | Speaker diarization + word-level alignment |
 | `resolving`    | Mistral Large (agentic loop) | Multi-turn tool-calling to resolve speaker identities |
 | `analyzing`    | Mistral Large | Extract decisions, ambiguities, action items |
@@ -495,6 +538,13 @@ curl -N "http://localhost:8000/api/jobs/$JOB/events?token=$API_KEY"
 
 # 3. Poll result (alternative to streaming)
 curl "http://localhost:8000/api/jobs/$JOB/result?token=$API_KEY"
+```
+
+**Standalone transcription (no pipeline):**
+```bash
+curl -X POST http://localhost:8000/api/transcribe \
+  -H "Authorization: Bearer $API_KEY" \
+  -F audio=@meeting.wav
 ```
 
 **Direct diarization (no orchestrator):**

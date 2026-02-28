@@ -36,12 +36,66 @@ pub async fn call_diarize(audio: &[u8]) -> anyhow::Result<Vec<DiarSegment>> {
     Ok(segments)
 }
 
+// ─── Drift detection ─────────────────────────────────────────────
+
+/// Detect systematic timestamp drift between word timestamps and diarization segments.
+/// Tests offsets from -150ms to +150ms in 10ms steps, returns the offset that maximizes
+/// total word-segment overlap.
+fn detect_drift(words: &[Word], diar_segments: &[DiarSegment]) -> f64 {
+    if words.is_empty() || diar_segments.is_empty() {
+        return 0.0;
+    }
+
+    let mut best_offset = 0.0_f64;
+    let mut best_overlap = f64::NEG_INFINITY;
+
+    // Test offsets from -150ms to +150ms in 10ms steps
+    let mut offset = -0.15_f64;
+    while offset <= 0.151 {
+        let mut total_overlap = 0.0_f64;
+        for w in words {
+            let ws = w.start - offset;
+            let we = w.end - offset;
+            for seg in diar_segments {
+                let ov = (we.min(seg.end) - ws.max(seg.start)).max(0.0);
+                total_overlap += ov;
+            }
+        }
+        if total_overlap > best_overlap {
+            best_overlap = total_overlap;
+            best_offset = offset;
+        }
+        offset += 0.01;
+    }
+
+    best_offset
+}
+
 // ─── Word-level alignment ──────────────────────────────────────────
 
 pub fn align_words_to_speakers(words: &[Word], diar_segments: &[DiarSegment]) -> Vec<AlignedWord> {
-    let mut aligned = Vec::with_capacity(words.len());
+    // Apply drift correction if significant
+    let drift = detect_drift(words, diar_segments);
+    let corrected: Vec<Word>;
+    let effective_words: &[Word] = if drift.abs() > 0.02 {
+        tracing::info!(drift_ms = (drift * 1000.0) as i64, "Applying timestamp drift correction");
+        corrected = words
+            .iter()
+            .map(|w| Word {
+                word: w.word.clone(),
+                start: w.start - drift,
+                end: w.end - drift,
+            })
+            .collect();
+        &corrected
+    } else {
+        tracing::debug!(drift_ms = (drift * 1000.0) as i64, "No significant drift detected");
+        words
+    };
 
-    for w in words {
+    let mut aligned = Vec::with_capacity(effective_words.len());
+
+    for w in effective_words {
         let word_dur = (w.end - w.start).max(0.001);
         let mut best_speaker: Option<String> = None;
         let mut best_overlap: f64 = 0.0;

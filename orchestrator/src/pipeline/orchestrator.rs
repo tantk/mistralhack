@@ -136,7 +136,7 @@ pub async fn run_pipeline(
     });
     result.write().await.phase = Some("analyzing".into());
 
-    let (decisions, ambiguities, analysis_action_items) =
+    let (decisions, ambiguities, analysis_action_items, extracted_title, extracted_date) =
         match call_analysis(&resolved_segments).await {
             Ok(r) => r,
             Err(e) => {
@@ -158,8 +158,8 @@ pub async fn run_pipeline(
 
     // Build meeting metadata
     let meeting_metadata = MeetingMetadata {
-        title: None,
-        date: None,
+        title: extracted_title,
+        date: extracted_date,
         duration: Some(format!("{:.1}s", transcription.duration_ms as f64 / 1000.0)),
         language: transcription.language.clone(),
     };
@@ -206,32 +206,35 @@ async fn proactive_acoustic_match(
 ) -> anyhow::Result<Vec<AcousticMatch>> {
     let gpu_base = diarization_url();
 
-    // Group diarization segments by speaker, pick the longest for each
-    let mut speaker_best: HashMap<String, &DiarSegment> = HashMap::new();
-    for seg in diar_segments {
-        let dur = seg.end - seg.start;
-        let is_longer = speaker_best
-            .get(&seg.speaker)
-            .map(|best| dur > (best.end - best.start))
-            .unwrap_or(true);
-        if is_longer {
-            speaker_best.insert(seg.speaker.clone(), seg);
-        }
-    }
+    // Group diarization segments by speaker, pick the best for each
+    let unique_speakers: Vec<String> = {
+        let mut seen = std::collections::HashSet::new();
+        diar_segments.iter().filter_map(|s| {
+            if seen.insert(s.speaker.clone()) { Some(s.speaker.clone()) } else { None }
+        }).collect()
+    };
 
     let client = reqwest::Client::new();
     let mut matches = Vec::new();
 
-    for (speaker_label, best_seg) in &speaker_best {
-        let duration_ms = ((best_seg.end - best_seg.start) * 1000.0) as i64;
-        if duration_ms < 500 {
+    for speaker_label in &unique_speakers {
+        let Some((seg_start, seg_end)) = select_best_segment(speaker_label, diar_segments) else {
             tracing::debug!(
                 job_id = %job_id,
                 speaker = %speaker_label,
-                "Segment too short for embedding ({duration_ms}ms), skipping"
+                "No suitable segment for embedding, skipping"
             );
             continue;
-        }
+        };
+
+        let duration_ms = ((seg_end - seg_start) * 1000.0) as i64;
+        tracing::debug!(
+            job_id = %job_id,
+            speaker = %speaker_label,
+            duration_ms = duration_ms,
+            "Selected segment {:.2}s-{:.2}s for embedding",
+            seg_start, seg_end
+        );
 
         // Step 1: Call GPU /embed with start_time/end_time to get embedding vector
         let part = reqwest::multipart::Part::bytes(audio_bytes.to_vec())
@@ -239,8 +242,8 @@ async fn proactive_acoustic_match(
             .mime_str("audio/wav")?;
         let form = reqwest::multipart::Form::new()
             .part("audio", part)
-            .text("start_time", best_seg.start.to_string())
-            .text("end_time", best_seg.end.to_string());
+            .text("start_time", seg_start.to_string())
+            .text("end_time", seg_end.to_string());
 
         let embed_result = client
             .post(format!("{}/embed", gpu_base))
@@ -303,6 +306,106 @@ async fn proactive_acoustic_match(
     }
 
     Ok(matches)
+}
+
+/// Select the best audio segment for a speaker's voiceprint embedding.
+/// Prefers: non-overlapping segments, ~5s duration, concatenation of adjacent segments if needed.
+fn select_best_segment(speaker: &str, diar_segments: &[DiarSegment]) -> Option<(f64, f64)> {
+    let mine: Vec<&DiarSegment> = diar_segments
+        .iter()
+        .filter(|s| s.speaker == speaker)
+        .collect();
+
+    if mine.is_empty() {
+        return None;
+    }
+
+    // Identify non-overlapping segments (no other speaker's segment overlaps temporally)
+    let non_overlapping: Vec<&DiarSegment> = mine
+        .iter()
+        .filter(|seg| {
+            !diar_segments.iter().any(|other| {
+                other.speaker != speaker
+                    && other.start < seg.end
+                    && other.end > seg.start
+            })
+        })
+        .copied()
+        .collect();
+
+    // Use non-overlapping if available, otherwise fall back to all
+    let candidates = if non_overlapping.is_empty() { &mine } else { &non_overlapping };
+
+    // Find single segment closest to 5.0s (minimum 500ms)
+    let best_single = candidates
+        .iter()
+        .filter(|s| (s.end - s.start) >= 0.5)
+        .min_by(|a, b| {
+            let da = ((a.end - a.start) - 5.0_f64).abs();
+            let db = ((b.end - b.start) - 5.0_f64).abs();
+            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+    if let Some(seg) = best_single {
+        if (seg.end - seg.start) >= 3.0 {
+            return Some((seg.start, seg.end));
+        }
+    }
+
+    // Try concatenating adjacent same-speaker segments (gap ≤ 0.5s, total ≤ 6s)
+    let mut sorted: Vec<&DiarSegment> = mine.clone();
+    sorted.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut best_concat: Option<(f64, f64, f64)> = None; // (start, end, distance_from_5s)
+    for i in 0..sorted.len() {
+        let mut end = sorted[i].end;
+        let start = sorted[i].start;
+        let mut total = end - start;
+
+        if total >= 0.5 && total <= 6.0 {
+            let dist = (total - 5.0).abs();
+            if best_concat.as_ref().map_or(true, |b| dist < b.2) {
+                best_concat = Some((start, end, dist));
+            }
+        }
+
+        for j in (i + 1)..sorted.len() {
+            let gap = sorted[j].start - end;
+            if gap > 0.5 {
+                break;
+            }
+            end = sorted[j].end;
+            total = end - start;
+            if total > 6.0 {
+                break;
+            }
+            if total >= 0.5 {
+                let dist = (total - 5.0).abs();
+                if best_concat.as_ref().map_or(true, |b| dist < b.2) {
+                    best_concat = Some((start, end, dist));
+                }
+            }
+        }
+    }
+
+    if let Some((start, end, _)) = best_concat {
+        if (end - start) >= 3.0 {
+            return Some((start, end));
+        }
+    }
+
+    // Final fallback: use the best single segment regardless of duration (if ≥ 500ms)
+    if let Some(seg) = best_single {
+        return Some((seg.start, seg.end));
+    }
+
+    // Absolute fallback: any segment ≥ 500ms
+    mine.iter()
+        .filter(|s| (s.end - s.start) >= 0.5)
+        .max_by(|a, b| {
+            (a.end - a.start).partial_cmp(&(b.end - b.start)).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|s| (s.start, s.end))
 }
 
 /// Threshold fallback: when the agent fails, apply acoustic matches with
