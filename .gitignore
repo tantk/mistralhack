@@ -1,0 +1,21 @@
+# Rust
+target/
+
+# Model weights (too large for git)
+models/
+hf_cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+gpu_service/data/
+*.egg-info/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Test audio (optional - large binary files)
+*.wav
