@@ -20,7 +20,7 @@ async def run_diarization(audio_path: str) -> list[dict]:
         with open(audio_path, "rb") as f:
             resp = await client.post(
                 f"{DIARIZATION_URL}/diarize",
-                files={"file": ("meeting.wav", f, "audio/wav")},
+                files={"audio": ("meeting.wav", f, "audio/wav")},
             )
         resp.raise_for_status()
 

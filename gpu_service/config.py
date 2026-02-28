@@ -2,11 +2,11 @@ import os
 
 # Server
 GPU_SERVICE_HOST = os.getenv("GPU_SERVICE_HOST", "0.0.0.0")
-GPU_SERVICE_PORT = int(os.getenv("GPU_SERVICE_PORT", "8082"))
+GPU_SERVICE_PORT = int(os.getenv("GPU_SERVICE_PORT", "8001"))
 
 # Pyannote (gated model — requires HF_TOKEN)
 HF_TOKEN = os.getenv("HF_TOKEN", "")
-PYANNOTE_MODEL = "pyannote/speaker-diarization-3.1"
+PYANNOTE_MODEL = "pyannote/speaker-diarization-4"
 PYANNOTE_MIN_SPEAKERS = int(os.getenv("PYANNOTE_MIN_SPEAKERS", "1"))
 PYANNOTE_MAX_SPEAKERS = int(os.getenv("PYANNOTE_MAX_SPEAKERS", "10"))
 

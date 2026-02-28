@@ -24,7 +24,7 @@
 ┌──────────────────────────┐   ┌──────────────────────────────────────┐
 │   PHASE A: TRANSCRIPTION │   │   PHASE B: DIARIZATION & IDENTITY   │
 │                          │   │                                      │
-│  Voxtral Transcribe V2   │   │  1. Pyannote 3.1 (HuggingFace)      │
+│  Voxtral Transcribe V2   │   │  1. Pyannote 4 (HuggingFace)      │
 │  ┌────────────────────┐  │   │     → Speaker segments [start, end]  │
 │  │ • Full transcript   │  │   │     → Handles overlap & crosstalk   │
 │  │ • Word timestamps   │  │   │                                      │
@@ -151,13 +151,13 @@ response = mistral_client.audio.transcribe(
 
 ### Phase B: Diarization & Acoustic Identity
 
-**Step B1: Pyannote 3.1 — Speaker Segmentation**
+**Step B1: Pyannote 4 — Speaker Segmentation**
 
 ```python
 from pyannote.audio import Pipeline
 
 pipeline = Pipeline.from_pretrained(
-    "pyannote/speaker-diarization-3.1",
+    "pyannote/speaker-diarization-4",
     use_auth_token=HF_TOKEN
 )
 
