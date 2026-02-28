@@ -32,6 +32,7 @@ interface AppState {
   setJobId: (id: string) => void
   setUploadProgress: (p: number) => void
   setTranscript: (t: string) => void
+  appendTranscript: (token: string) => void
   setRevealedWordCount: (n: number) => void
   setAudioDuration: (d: number) => void
   setSegments: (s: Segment[]) => void
@@ -70,6 +71,7 @@ export const useStore = create<AppState>((set) => ({
   setJobId: (jobId) => set({ jobId }),
   setUploadProgress: (uploadProgress) => set({ uploadProgress }),
   setTranscript: (transcript) => set({ transcript }),
+  appendTranscript: (token) => set((s) => ({ transcript: s.transcript + token })),
   setRevealedWordCount: (revealedWordCount) => set({ revealedWordCount }),
   setAudioDuration: (audioDuration) => set({ audioDuration }),
   setSegments: (segments) => set({ segments }),

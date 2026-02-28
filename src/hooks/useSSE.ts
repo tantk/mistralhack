@@ -20,6 +20,7 @@ export function useSSE(jobId: string | null) {
   // won't re-run when unrelated store state changes.
   const setPhase = useStore((s) => s.setPhase)
   const setTranscript = useStore((s) => s.setTranscript)
+  const appendTranscript = useStore((s) => s.appendTranscript)
   const setSegments = useStore((s) => s.setSegments)
   const setDecisions = useStore((s) => s.setDecisions)
   const setAmbiguities = useStore((s) => s.setAmbiguities)
@@ -37,6 +38,11 @@ export function useSSE(jobId: string | null) {
     es.addEventListener('phase_start', (e) => {
       const { phase } = JSON.parse(e.data)
       setPhase(phase)
+    })
+
+    es.addEventListener('transcript_token', (e) => {
+      const data = JSON.parse(e.data)
+      appendTranscript(data.token)
     })
 
     es.addEventListener('transcript_complete', (e) => {
@@ -71,7 +77,7 @@ export function useSSE(jobId: string | null) {
     return () => {
       es.close()
     }
-  }, [jobId, setPhase, setTranscript, setSegments, setDecisions, setAmbiguities, setActionItems, setStage])
+  }, [jobId, setPhase, setTranscript, appendTranscript, setSegments, setDecisions, setAmbiguities, setActionItems, setStage])
 
   function startPolling(id: string) {
     const interval = setInterval(async () => {

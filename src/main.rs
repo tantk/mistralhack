@@ -1,16 +1,21 @@
+use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use axum::extract::{Multipart, State};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
+use futures::{Stream, StreamExt};
 use mistralrs::{
-    AudioInput, AutoDeviceMapParams, DeviceMapSetting, IsqType, TextMessageRole,
-    VisionModelBuilder, VisionMessages,
+    AudioInput, AutoDeviceMapParams, ChatCompletionChunkResponse, ChunkChoice, Delta,
+    DeviceMapSetting, IsqType, Response, TextMessageRole, VisionModelBuilder, VisionMessages,
 };
 use serde::Serialize;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(Parser)]
 #[command(name = "mistralhack", about = "Voxtral speech-to-text via mistral.rs")]
@@ -109,6 +114,7 @@ async fn main() -> Result<()> {
             let app = Router::new()
                 .route("/health", get(health))
                 .route("/transcribe", post(transcribe_handler))
+                .route("/transcribe/stream", post(transcribe_stream_handler))
                 .with_state(state);
 
             let addr = format!("{host}:{port}");
@@ -174,6 +180,118 @@ fn bad_request(msg: String) -> (axum::http::StatusCode, Json<ErrorResponse>) {
         axum::http::StatusCode::BAD_REQUEST,
         Json(ErrorResponse { error: msg }),
     )
+}
+
+async fn transcribe_stream_handler(
+    State(state): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, (axum::http::StatusCode, Json<ErrorResponse>)>
+{
+    let mut audio_bytes: Option<Vec<u8>> = None;
+    let mut prompt = "Transcribe this audio.".to_string();
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "audio" => {
+                audio_bytes =
+                    Some(field.bytes().await.map_err(|e| bad_request(e.to_string()))?.to_vec());
+            }
+            "prompt" => {
+                prompt = field.text().await.map_err(|e| bad_request(e.to_string()))?;
+            }
+            _ => {}
+        }
+    }
+
+    let audio_bytes = audio_bytes.ok_or_else(|| bad_request("Missing 'audio' field".into()))?;
+
+    let (tx, rx) = tokio::sync::mpsc::channel::<Event>(32);
+
+    tokio::spawn(async move {
+        let audio = match AudioInput::from_bytes(&audio_bytes) {
+            Ok(a) => a,
+            Err(e) => {
+                let _ = tx
+                    .send(
+                        Event::default()
+                            .event("error")
+                            .data(serde_json::json!({"error": e.to_string()}).to_string()),
+                    )
+                    .await;
+                return;
+            }
+        };
+
+        let messages = VisionMessages::new().add_multimodal_message(
+            TextMessageRole::User,
+            &prompt,
+            vec![],
+            vec![audio],
+        );
+
+        let mut stream = match state.model.stream_chat_request(messages).await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = tx
+                    .send(
+                        Event::default()
+                            .event("error")
+                            .data(serde_json::json!({"error": e.to_string()}).to_string()),
+                    )
+                    .await;
+                return;
+            }
+        };
+
+        let mut full_text = String::new();
+
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Response::Chunk(ChatCompletionChunkResponse { choices, .. }) => {
+                    if let Some(ChunkChoice {
+                        delta: Delta {
+                            content: Some(text),
+                            ..
+                        },
+                        ..
+                    }) = choices.first()
+                    {
+                        let clean = text
+                            .replace("[STREAMING_PAD]", "")
+                            .replace("[STREAMING_WORD]", "");
+                        if !clean.is_empty() {
+                            full_text.push_str(&clean);
+                            let _ = tx
+                                .send(
+                                    Event::default()
+                                        .event("token")
+                                        .data(
+                                            serde_json::json!({"token": clean}).to_string(),
+                                        ),
+                                )
+                                .await;
+                        }
+                    }
+                }
+                Response::Done(_) => break,
+                _ => {}
+            }
+        }
+
+        let final_text = full_text.trim().to_string();
+        let _ = tx
+            .send(
+                Event::default()
+                    .event("done")
+                    .data(serde_json::json!({"text": final_text}).to_string()),
+            )
+            .await;
+    });
+
+    let stream = ReceiverStream::new(rx).map(|event| Ok::<_, Infallible>(event));
+
+    Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
 }
 
 // ---- core inference ----

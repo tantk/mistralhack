@@ -43,6 +43,8 @@ fn mistral_api_key() -> String {
 pub enum PipelineEvent {
     #[serde(rename = "phase_start")]
     PhaseStart { phase: String },
+    #[serde(rename = "transcript_token")]
+    TranscriptToken { token: String },
     #[serde(rename = "transcript_complete")]
     TranscriptComplete { text: String, duration_ms: u64 },
     #[serde(rename = "diarization_complete")]
@@ -238,6 +240,9 @@ fn event_to_sse(ev: &PipelineEvent) -> (&'static str, serde_json::Value) {
         PipelineEvent::PhaseStart { phase } => {
             ("phase_start", serde_json::json!({ "phase": phase }))
         }
+        PipelineEvent::TranscriptToken { token } => {
+            ("transcript_token", serde_json::json!({ "token": token }))
+        }
         PipelineEvent::TranscriptComplete { text, duration_ms } => (
             "transcript_complete",
             serde_json::json!({ "text": text, "duration_ms": duration_ms }),
@@ -278,7 +283,7 @@ async fn run_pipeline(
     });
     result.write().await.phase = Some("transcribing".into());
 
-    let transcript = match call_voxtral(&audio_bytes).await {
+    let transcript = match call_voxtral(&audio_bytes, &tx).await {
         Ok(text) => text,
         Err(e) => {
             tracing::error!(job_id = %job_id, "Transcription failed: {e}");
@@ -379,7 +384,10 @@ async fn set_error(
 
 // ─── Service calls ──────────────────────────────────────────────────
 
-async fn call_voxtral(audio: &[u8]) -> anyhow::Result<String> {
+async fn call_voxtral(
+    audio: &[u8],
+    tx: &broadcast::Sender<PipelineEvent>,
+) -> anyhow::Result<String> {
     let client = reqwest::Client::new();
     let part = reqwest::multipart::Part::bytes(audio.to_vec())
         .file_name("audio.wav")
@@ -387,9 +395,9 @@ async fn call_voxtral(audio: &[u8]) -> anyhow::Result<String> {
     let form = reqwest::multipart::Form::new().part("audio", part);
 
     let resp = client
-        .post(format!("{}/transcribe", voxtral_url()))
+        .post(format!("{}/transcribe/stream", voxtral_url()))
         .multipart(form)
-        .timeout(Duration::from_secs(120))
+        .timeout(Duration::from_secs(300))
         .send()
         .await?;
 
@@ -399,8 +407,57 @@ async fn call_voxtral(audio: &[u8]) -> anyhow::Result<String> {
         anyhow::bail!("Voxtral returned {status}: {body}");
     }
 
-    let data: serde_json::Value = resp.json().await?;
-    Ok(data["text"].as_str().unwrap_or("").to_string())
+    // Parse SSE stream from response
+    use futures::StreamExt;
+    let mut full_text = String::new();
+    let mut current_event = String::new();
+    let mut byte_stream = resp.bytes_stream();
+    let mut buf = String::new();
+
+    while let Some(chunk) = byte_stream.next().await {
+        let chunk = chunk?;
+        buf.push_str(&String::from_utf8_lossy(&chunk));
+
+        // Process complete lines from buffer
+        while let Some(newline_pos) = buf.find('\n') {
+            let line = buf[..newline_pos].trim_end_matches('\r').to_string();
+            buf = buf[newline_pos + 1..].to_string();
+
+            if line.starts_with("event: ") {
+                current_event = line["event: ".len()..].to_string();
+            } else if line.starts_with("data: ") {
+                let data = &line["data: ".len()..];
+                match current_event.as_str() {
+                    "token" => {
+                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(data) {
+                            if let Some(token) = parsed["token"].as_str() {
+                                full_text.push_str(token);
+                                let _ = tx.send(PipelineEvent::TranscriptToken {
+                                    token: token.to_string(),
+                                });
+                            }
+                        }
+                    }
+                    "done" => {
+                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(data) {
+                            if let Some(text) = parsed["text"].as_str() {
+                                return Ok(text.to_string());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                current_event.clear();
+            }
+        }
+    }
+
+    // If we didn't get a done event, return accumulated text
+    if !full_text.is_empty() {
+        Ok(full_text.trim().to_string())
+    } else {
+        anyhow::bail!("Voxtral stream ended without producing any text")
+    }
 }
 
 #[derive(Deserialize)]

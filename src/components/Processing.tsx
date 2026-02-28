@@ -1,8 +1,6 @@
-import { useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store/appStore'
 import { useSSE } from '../hooks/useSSE'
-import { useWordReveal } from '../hooks/useWordReveal'
 
 const PHASES = [
   { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech → Text' },
@@ -15,12 +13,10 @@ type PhaseId = typeof PHASES[number]['id']
 const PHASE_ORDER: PhaseId[] = ['transcribing', 'diarizing', 'analyzing']
 
 export default function Processing() {
-  const { jobId, phase } = useStore()
-  const transcriptRef = useRef<HTMLSpanElement>(null)
+  const { jobId, phase, transcript } = useStore()
 
   // Connect SSE (or fallback poll) for this job
   useSSE(jobId)
-  useWordReveal(transcriptRef as React.RefObject<HTMLElement>)
 
   const currentIndex = phase ? PHASE_ORDER.indexOf(phase) : -1
 
@@ -85,7 +81,7 @@ export default function Processing() {
             <span className="chrome-title">transcript</span>
           </div>
           <div className="transcript-body">
-            <span ref={transcriptRef} className="transcript-text" />
+            <span className="transcript-text">{transcript}</span>
             <span className="cursor-blink" />
           </div>
         </div>
