@@ -1,212 +1,132 @@
-# VoiceGraph — Infrastructure Architecture
+# MeetingMind — Architecture
 
-## Network Topology
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                          INTERNET                                    │
-│                                                                      │
-│   External devices (no VPN, no Tailscale)                            │
-│   curl https://tan.tail2e1adb.ts.net/api/transcribe                  │
-└──────────────────────┬───────────────────────────────────────────────┘
-                       │
-                       │  Tailscale Funnel (HTTPS, public)
-                       │
-┌──────────────────────▼───────────────────────────────────────────────┐
-│  tan — NUC Linux Server (Intel NUC)                                  │
-│  Hostname: tan                                                       │
-│  LAN: 192.168.0.121  |  Tailscale: 100.121.213.25                    │
-│                                                                      │
-│  ┌────────────────────────────────────────────────────────────┐      │
-│  │  server (FastAPI + Uvicorn)                            │      │
-│  │  Port: 8000                                                │      │
-│  │  systemd: server.service (user)                        │      │
-│  │                                                            │      │
-│  │  Endpoints:                                                │      │
-│  │    GET  /                     → Web UI (static)            │      │
-│  │    POST /api/transcribe       → Proxy to titan (HTTP API)  │      │
-│  │    WS   /ws/transcribe/{id}   → Real-time meeting stream   │      │
-│  │    POST /api/meetings         → CRUD meetings              │      │
-│  │    POST /api/meetings/{id}/diarize → Trigger diarization   │      │
-│  └────────────────────────────────────────────────────────────┘      │
-│                                                                      │
-│  ┌────────────────────────────────────────────────────────────┐      │
-│  │  Tailscale Funnel                                          │      │
-│  │  Public URL: https://tan.tail2e1adb.ts.net                 │      │
-│  │  Proxies HTTPS → http://127.0.0.1:8000                     │      │
-│  │  Persistent config (survives reboots)                      │      │
-│  └────────────────────────────────────────────────────────────┘      │
-│                                                                      │
-│  Storage:                                                            │
-│    meetings.db         — SQLite (meetings + transcript segments)      │
-│    audio_storage/      — WAV files per meeting                       │
-└──────────────────────┬───────────────────────────────────────────────┘
-                       │
-                       │  LAN: 192.168.0.x (preferred, lower latency)
-                       │  Tailscale: 100.67.74.52 (fallback)
-                       │
-┌──────────────────────▼───────────────────────────────────────────────┐
-│  titan — Windows GPU Machine                                         │
-│  LAN: 192.168.0.105  |  Tailscale: 100.67.74.52                     │
-│  WSL2 gateway: 172.17.144.1                                          │
-│                                                                      │
-│  ┌─────────────────────────────────┐  ┌────────────────────────────┐ │
-│  │  Voxtral Transcription (Rust)   │  │  Diarization (Python)      │ │
-│  │  mistral.rs + Voxtral Mini 4B   │  │  Pyannote 3.1 (CUDA)      │ │
-│  │  Port: 8080                     │  │  Port: 8001                │ │
-│  │                                 │  │                            │ │
-│  │  POST /transcribe               │  │  POST /diarize             │ │
-│  │    → multipart: audio file      │  │    → multipart: audio file │ │
-│  │    ← {"text": "..."}            │  │    ← {"segments": [...]}   │ │
-│  │                                 │  │                            │ │
-│  │  GET /health                    │  │                            │ │
-│  │    ← {"status":"ok",            │  │                            │ │
-│  │       "model":"...Voxtral..."}  │  │                            │ │
-│  └─────────────────────────────────┘  └────────────────────────────┘ │
-│                                                                      │
-│  Runs inside WSL2 (Ubuntu) on Windows host                           │
-│  NVIDIA GPU passthrough via CUDA                                     │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-## Request Flow
-
-### External device → Transcription
+## Deployment Overview
 
 ```
-External device
-  │
-  │  HTTPS POST /api/transcribe  (audio file)
-  ▼
-Tailscale Funnel (tan.tail2e1adb.ts.net)
-  │
-  │  HTTP → localhost:8000
-  ▼
-NUC FastAPI (server)
-  │
-  │  HTTP POST /transcribe  (multipart)
-  ▼
-titan:8080 (mistral.rs / Voxtral)
-  │
-  │  {"text": "transcribed text"}
-  ▼
-Response back through the chain
+GitHub (master)
+    │
+    │  push triggers GitHub Action
+    ▼
+HF Space: mistral-hackaton-2026/meetingmind
+    │  Docker build (multi-stage)
+    ▼
+┌─────────────────────────────────────────────────┐
+│  Container (port 7860)                          │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Rust Orchestrator (Axum)                 │  │
+│  │  - /api/health (no auth)                  │  │
+│  │  - /api/jobs, /api/jobs/{id}/events, ...  │  │
+│  │  - /api/speakers/enroll, /api/speakers    │  │
+│  │  - Static frontend (React SPA)            │  │
+│  └─────────┬─────────────────┬───────────────┘  │
+│            │                 │                   │
+│   Local zvec store     Bearer token auth         │
+│   (data/voiceprints/)  (API_KEY env)             │
+└────────────┼─────────────────┼───────────────────┘
+             │                 │
+             ▼                 ▼
+   Mistral API           HF Inference Endpoint
+   ├── voxtral-mini      ├── POST /diarize (Pyannote)
+   │   (transcription)   └── POST /embed  (FunASR ERes2NetV2)
+   └── mistral-large
+       (agent + analysis)
 ```
 
-### Browser → Real-time meeting transcription
+## Pipeline
 
-```
-Browser (LAN)
-  │
-  │  WebSocket /ws/transcribe/{meeting_id}
-  ▼
-NUC FastAPI
-  │  1. Receives audio chunks (WebM)
-  │  2. Converts WebM → WAV (16kHz mono)
-  │  3. Sends WAV to titan:8080/transcribe
-  │  4. Stores segment in SQLite
-  │  5. Sends transcript back via WebSocket
-  │
-  │  On meeting end + diarize request:
-  │  6. Sends full audio to titan:8001/diarize
-  │  7. Merges speaker labels with transcript by timestamp overlap
-  ▼
-titan (GPU)
-  ├── :8080  Voxtral (real-time transcription)
-  └── :8001  Pyannote (speaker diarization)
-```
+The orchestrator runs a sequential pipeline per job:
 
-## Machines
+| Phase | Service | What happens |
+|-------|---------|-------------|
+| **transcribing** | Mistral API (`voxtral-mini-latest`) | Audio → text with word-level timestamps. Auto-chunks audio >30 min |
+| **diarizing** | HF Inference Endpoint (Pyannote) | Speaker diarization, drift correction, word-level alignment |
+| **acoustic_matching** | HF Inference Endpoint (FunASR) + local zvec | Proactive voiceprint matching per speaker segment |
+| **resolving** | Mistral API (`mistral-large-latest`) | Agentic tool-calling loop (5 tools, max 5 iterations) |
+| **analyzing** | Mistral API (`mistral-large-latest`) | Extract decisions, ambiguities, action items, dynamics |
 
-| Name | Role | OS | IP (LAN) | IP (Tailscale) | Hardware |
-|------|------|----|-----------|----------------|----------|
-| **tan** | API gateway, web UI, orchestrator | Linux (Ubuntu) | 192.168.0.121 | 100.121.213.25 | Intel NUC |
-| **titan** | GPU inference (transcription + diarization) | Windows + WSL2 | 192.168.0.105 | 100.67.74.52 | NVIDIA GPU |
+### Degraded Mode (No GPU)
 
-## Services
+When the HF Inference Endpoint is unavailable:
 
-### tan (NUC)
+| Feature | With GPU | Without GPU |
+|---------|----------|-------------|
+| Transcription | Mistral API | Mistral API (unchanged) |
+| Diarization | Pyannote | Mistral API `diarize=true` (lower quality) |
+| Acoustic matching | ERes2NetV2 embeddings + zvec | Skipped |
+| Speaker enrollment | Available | Returns 503 |
+| Agent resolution | Semantic + acoustic | Semantic only |
 
-| Service | Type | Port | Command |
-|---------|------|------|---------|
-| server | systemd user service | 8000 | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
-| Tailscale Funnel | tailscale config | 443→8000 | `tailscale funnel --bg 8000` |
+## Key Components
 
-```bash
-# Manage NUC server
-systemctl --user status server
-systemctl --user restart server
-journalctl --user -u server -f
+### Orchestrator (`orchestrator/src/`)
 
-# Manage funnel
-tailscale funnel status
-tailscale funnel --bg 8000        # enable
-tailscale funnel --https=443 off  # disable
-```
+| Module | Purpose |
+|--------|---------|
+| `main.rs` | Server setup, auth middleware, health endpoint, static file serving |
+| `pipeline/types.rs` | Domain types, SSE events, GPU health cache, config |
+| `pipeline/routes.rs` | HTTP handlers — job CRUD, SSE streaming, speaker enrollment |
+| `pipeline/orchestrator.rs` | Pipeline coordinator — runs all phases sequentially |
+| `pipeline/transcription.rs` | Mistral API transcription, audio chunking (>30 min), WAV parsing |
+| `pipeline/diarization.rs` | GPU diarization, Mistral fallback, drift detection, word-speaker alignment |
+| `pipeline/agent.rs` | 5-tool agent loop, speaker resolution, merge logic |
+| `pipeline/alignment.rs` | Transcript-to-diarization alignment (LLM or proportional fallback) |
+| `pipeline/analysis.rs` | Decision/ambiguity/action-item extraction, meeting dynamics |
+| `pipeline/voiceprint.rs` | zvec-backed local voiceprint store (192-dim embeddings) |
 
-### titan (Windows GPU)
+### GPU Service (`gpu_service/hf_endpoint/`)
 
-| Service | Port | Backend |
-|---------|------|---------|
-| Voxtral transcription | 8080 | Rust (mistral.rs) serving Voxtral-Mini-4B-Realtime-2602 |
-| Speaker diarization | 8001 | Python (FastAPI) running pyannote/speaker-diarization-3.1 |
+Stateless FastAPI service deployed as an HF Inference Endpoint. Exposes only:
+- `POST /diarize` — Pyannote speaker diarization
+- `POST /embed` — FunASR speaker embeddings (192-dim)
+- `GET /health` — GPU availability check
 
-## Configuration
+### Frontend (`src/`)
 
-### NUC `.env` (server/.env)
+React + Vite + Zustand + Zod. Key files:
 
-```bash
-# titan - Windows GPU machine
-# Tailscale: 100.67.74.52 | LAN: 192.168.0.105 | WSL gateway: 172.17.144.1
-MISTRAL_RS_URL=http://192.168.0.105:8080    # LAN preferred (Tailscale fallback: 100.67.74.52:8080)
-DIARIZATION_URL=http://192.168.0.105:8001   # LAN preferred (Tailscale fallback: 100.67.74.52:8001)
-DATABASE_PATH=meetings.db
-AUDIO_STORAGE_PATH=audio_storage
-```
+| File | Purpose |
+|------|---------|
+| `api/backend.ts` | Backend URL discovery (HF Space vs local, with probe + cache) |
+| `api/client.ts` | Zod schemas, auth helpers, `submitJob()` |
+| `hooks/useSSE.ts` | SSE event stream + polling fallback |
+| `store/appStore.ts` | Zustand store — all pipeline state |
+| `components/Upload.tsx` | Drag-and-drop audio upload |
+| `components/Processing.tsx` | Live progress + transcript + agent activity |
+| `components/Results.tsx` | Tabbed results view |
+| `components/Timeline.tsx` | Speaker-lane timeline with audio player |
+| `components/Ledger.tsx` | Decision log + action items |
+| `components/Clarification.tsx` | Ambiguity review (client-side only) |
 
-## API Reference
+## Environment Variables
 
-### Public endpoint (via Tailscale Funnel)
+### Orchestrator (required in HF Space settings)
 
-**Transcribe audio:**
-```bash
-curl -X POST https://tan.tail2e1adb.ts.net/api/transcribe \
-  -F "audio=@recording.wav"
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MISTRAL_API_KEY` | — | Mistral API key (required) |
+| `DIARIZATION_URL` | `http://192.168.0.105:8001` | HF Inference Endpoint URL |
+| `API_KEY` | *(empty = no auth)* | Bearer token for API auth |
+| `PORT` | `7860` | Listen port |
+| `VOICEPRINT_STORE_PATH` | `data/voiceprints` | Local zvec store path |
 
-**Response:**
-```json
-{"text": "Hello, this is the transcribed text."}
-```
+### Frontend (build-time)
 
-### Direct to titan (LAN only)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_HF_SPACE_URL` | `https://mistral-hackaton-2026-meetingmind.hf.space` | Override HF Space URL for backend discovery |
 
-```bash
-# Transcription
-curl -X POST http://192.168.0.105:8080/transcribe \
-  -F "audio=@recording.wav"
+## Deploy
 
-# With custom prompt
-curl -X POST http://192.168.0.105:8080/transcribe \
-  -F "audio=@recording.wav" \
-  -F "prompt=Transcribe with punctuation and speaker labels."
+Push to `master` auto-deploys to HF Spaces via GitHub Action (`.github/workflows/deploy-hf.yml`).
 
-# Health check
-curl http://192.168.0.105:8080/health
-```
+Manual deploy: `./scripts/deploy-hf.sh`
 
-## Dependencies
+## Legacy / Archived
 
-### NUC (Python 3.14)
-
-```
-fastapi, uvicorn[standard], aiosqlite, httpx, pydub, python-multipart, websockets, python-dotenv
-```
-
-Also requires: `ffmpeg`, `audioop-lts` (Python 3.13+ compatibility)
-
-### titan (WSL2)
-
-- **Rust backend:** mistral.rs + Voxtral model weights
-- **Python diarization:** pyannote.audio, torch (CUDA), soundfile
-- **System:** NVIDIA drivers (Windows host), CUDA toolkit (WSL2)
+The `archive/` directory contains previous iterations:
+- `archive/gpu_service_legacy/` — Python voiceprint store (FAISS) and transcription module, replaced by orchestrator zvec + Mistral API
+- `archive/server_legacy/` — Gen-2 Python FastAPI server (SQLite, WebSocket), fully replaced by Rust orchestrator
+- `archive/scripts_legacy/` — LAN deployment scripts (systemd, port-proxy), replaced by HF Spaces Docker deploy
+- `archive/server/` — Gen-1 prototype
+- Evaluation scripts, AMI benchmark results
