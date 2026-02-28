@@ -63,13 +63,24 @@ pub async fn call_mistral_transcribe(
         .map(|d| (d * 1000.0) as u64)
         .unwrap_or(0);
 
-    let words: Vec<Word> = data["words"]
+    // Mistral API returns word timestamps in "segments" (not "words")
+    // Each segment: {"text": " word", "start": 0.1, "end": 0.2, ...}
+    let words: Vec<Word> = data["segments"]
         .as_array()
+        .or_else(|| data["words"].as_array())
         .map(|arr| {
             arr.iter()
                 .filter_map(|w| {
+                    let word_text = w["text"]
+                        .as_str()
+                        .or_else(|| w["word"].as_str())?
+                        .trim()
+                        .to_string();
+                    if word_text.is_empty() {
+                        return None;
+                    }
                     Some(Word {
-                        word: w["word"].as_str()?.to_string(),
+                        word: word_text,
                         start: w["start"].as_f64()?,
                         end: w["end"].as_f64()?,
                     })
@@ -107,7 +118,8 @@ pub async fn call_voxtral(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Voxtral returned {status}: {body}");
+        tracing::warn!("Voxtral streaming endpoint returned {status}: {body}, trying non-streaming");
+        return call_voxtral_non_streaming(audio).await;
     }
 
     // Parse SSE stream from response
@@ -161,4 +173,38 @@ pub async fn call_voxtral(
     } else {
         anyhow::bail!("Voxtral stream ended without producing any text")
     }
+}
+
+/// Non-streaming Voxtral fallback: POST /transcribe, returns {"text": "..."}
+async fn call_voxtral_non_streaming(audio: &[u8]) -> anyhow::Result<String> {
+    let client = reqwest::Client::new();
+    let part = reqwest::multipart::Part::bytes(audio.to_vec())
+        .file_name("audio.wav")
+        .mime_str("audio/wav")?;
+    let form = reqwest::multipart::Form::new().part("audio", part);
+
+    let resp = client
+        .post(format!("{}/transcribe", voxtral_url()))
+        .multipart(form)
+        .timeout(Duration::from_secs(300))
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Voxtral non-streaming returned {status}: {body}");
+    }
+
+    let data: serde_json::Value = resp.json().await?;
+    let text = data["text"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+
+    if text.is_empty() {
+        anyhow::bail!("Voxtral returned empty text");
+    }
+
+    Ok(text)
 }

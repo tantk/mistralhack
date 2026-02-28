@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 
 use super::types::*;
+use super::voiceprint::SharedVoiceprintStore;
 
 fn build_tool_schemas() -> serde_json::Value {
     serde_json::json!([
@@ -219,8 +220,14 @@ async fn execute_tool(
             let start = args["start_time"].as_f64().unwrap_or(0.0);
             let end = args["end_time"].as_f64().unwrap_or(0.0);
 
-            match call_voiceprint_identify(&ctx.audio_bytes, start, end, &ctx.diarization_url)
-                .await
+            match call_embed_and_identify(
+                &ctx.audio_bytes,
+                start,
+                end,
+                &ctx.diarization_url,
+                &ctx.voiceprint_store,
+            )
+            .await
             {
                 Ok(matches) => {
                     let result = serde_json::to_string(&matches).unwrap_or_else(|_| "[]".into());
@@ -293,11 +300,13 @@ async fn execute_tool(
     }
 }
 
-async fn call_voiceprint_identify(
+/// Call GPU /embed to extract embedding, then look up in local Zvec store.
+async fn call_embed_and_identify(
     audio: &[u8],
     start: f64,
     end: f64,
     diarization_url: &str,
+    voiceprint_store: &SharedVoiceprintStore,
 ) -> anyhow::Result<serde_json::Value> {
     let client = reqwest::Client::new();
     let part = reqwest::multipart::Part::bytes(audio.to_vec())
@@ -309,7 +318,7 @@ async fn call_voiceprint_identify(
         .text("end_time", end.to_string());
 
     let resp = client
-        .post(format!("{}/voiceprint/identify", diarization_url))
+        .post(format!("{}/embed", diarization_url))
         .multipart(form)
         .timeout(Duration::from_secs(30))
         .send()
@@ -318,11 +327,30 @@ async fn call_voiceprint_identify(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Voiceprint identify returned {status}: {body}");
+        anyhow::bail!("GPU /embed returned {status}: {body}");
     }
 
     let data: serde_json::Value = resp.json().await?;
-    Ok(data["matches"].clone())
+    let embedding: Vec<f32> = data["embedding"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("No embedding in GPU response"))?
+        .iter()
+        .filter_map(|v| v.as_f64().map(|f| f as f32))
+        .collect();
+
+    let matches = voiceprint_store.identify(&embedding, 3).await?;
+    let matches_json: Vec<serde_json::Value> = matches
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "name": m.name,
+                "id": m.id,
+                "similarity": m.similarity,
+            })
+        })
+        .collect();
+
+    Ok(serde_json::Value::Array(matches_json))
 }
 
 pub async fn run_agent(
@@ -331,6 +359,7 @@ pub async fn run_agent(
     audio_bytes: &[u8],
     acoustic_matches: &[AcousticMatch],
     attendees: &[String],
+    voiceprint_store: &SharedVoiceprintStore,
 ) -> anyhow::Result<(Vec<Segment>, Vec<ActionItemRich>)> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
@@ -345,6 +374,7 @@ pub async fn run_agent(
         ambiguities: Vec::new(),
         action_items: Vec::new(),
         diarization_url: diarization_url(),
+        voiceprint_store: voiceprint_store.clone(),
     };
 
     let user_message = build_user_message(segments, acoustic_matches, attendees);

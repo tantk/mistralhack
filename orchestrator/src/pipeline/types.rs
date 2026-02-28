@@ -217,4 +217,5 @@ pub struct ToolContext {
     pub ambiguities: Vec<AgentAmbiguity>,
     pub action_items: Vec<ActionItemRich>,
     pub diarization_url: String,
+    pub voiceprint_store: super::voiceprint::SharedVoiceprintStore,
 }

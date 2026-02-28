@@ -6,5 +6,6 @@ pub mod diarization;
 pub mod alignment;
 pub mod agent;
 pub mod analysis;
+pub mod voiceprint;
 
 pub use routes::router;

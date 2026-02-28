@@ -60,10 +60,20 @@ async def diarize_endpoint(
 
 
 @app.post("/embed")
-async def embed_endpoint(audio: UploadFile = File(...)):
+async def embed_endpoint(
+    audio: UploadFile = File(...),
+    start_time: Optional[float] = Form(None),
+    end_time: Optional[float] = Form(None),
+):
     try:
         raw = await audio.read()
-        audio_16k = prepare_audio(raw)
+        if start_time is not None and end_time is not None:
+            audio_seg = AudioSegment.from_file(io.BytesIO(raw))
+            audio_seg = audio_seg[int(start_time * 1000):int(end_time * 1000)]
+            audio_seg = audio_seg.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+            audio_16k = np.array(audio_seg.get_array_of_samples(), dtype=np.float32) / 32768.0
+        else:
+            audio_16k = prepare_audio(raw)
         emb = extract_embedding(audio_16k)
         return {"embedding": emb.tolist(), "dim": len(emb)}
     except Exception as e:

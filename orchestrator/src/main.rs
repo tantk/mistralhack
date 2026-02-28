@@ -1,9 +1,10 @@
 mod pipeline;
 
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use axum::{
     body::Body,
+    extract::DefaultBodyLimit,
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Json},
@@ -74,8 +75,15 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    // Initialize voiceprint store
+    let store_path = pipeline::voiceprint::store_path();
+    let voiceprint_store = Arc::new(
+        pipeline::voiceprint::VoiceprintStore::init(&store_path)
+            .expect("Failed to initialize voiceprint store"),
+    );
+
     // Auth only gates /api/ routes (not static files)
-    let api = pipeline::router()
+    let api = pipeline::router(voiceprint_store)
         .layer(middleware::from_fn(auth));
 
     // Static file serving for frontend (SPA fallback to index.html)
@@ -85,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .merge(api)
         .fallback_service(static_service)
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB
         .layer(cors);
 
     let api_key = env::var("API_KEY").unwrap_or_default();

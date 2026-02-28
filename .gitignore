@@ -25,3 +25,6 @@ data/
 node_modules/
 **/node_modules/
 hackathon_plan.md
+
+# Build output
+dist/

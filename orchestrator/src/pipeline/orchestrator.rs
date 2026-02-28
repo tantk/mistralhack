@@ -9,6 +9,7 @@ use super::analysis::{call_analysis, compute_meeting_dynamics};
 use super::diarization::{align_words_to_speakers, call_diarize, group_into_segments, DiarSegment};
 use super::transcription::call_mistral_transcribe;
 use super::types::*;
+use super::voiceprint::SharedVoiceprintStore;
 
 pub async fn run_pipeline(
     tx: broadcast::Sender<PipelineEvent>,
@@ -16,6 +17,7 @@ pub async fn run_pipeline(
     audio_bytes: Vec<u8>,
     job_id: String,
     attendees: Vec<String>,
+    voiceprint_store: SharedVoiceprintStore,
 ) {
     tracing::info!(job_id = %job_id, "Pipeline starting");
 
@@ -86,7 +88,7 @@ pub async fn run_pipeline(
     result.write().await.phase = Some("acoustic_matching".into());
 
     let acoustic_matches =
-        match proactive_acoustic_match(&audio_bytes, &diar_segments, &job_id).await {
+        match proactive_acoustic_match(&audio_bytes, &diar_segments, &job_id, &voiceprint_store).await {
             Ok(matches) => {
                 tracing::info!(
                     job_id = %job_id,
@@ -115,7 +117,7 @@ pub async fn run_pipeline(
     result.write().await.phase = Some("resolving".into());
 
     let (resolved_segments, agent_action_items) =
-        match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees).await {
+        match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees, &voiceprint_store).await {
             Ok((segs, items)) => (segs, items),
             Err(e) => {
                 tracing::warn!(job_id = %job_id, "Agent resolution failed, applying threshold fallback: {e}");
@@ -195,13 +197,14 @@ pub async fn run_pipeline(
 }
 
 /// Proactive acoustic matching: for each unique diarization speaker, pick the
-/// longest segment as representative, call /voiceprint/identify, and return matches.
+/// longest segment as representative, call GPU /embed, and look up in local Zvec.
 async fn proactive_acoustic_match(
     audio_bytes: &[u8],
     diar_segments: &[DiarSegment],
     job_id: &str,
+    voiceprint_store: &SharedVoiceprintStore,
 ) -> anyhow::Result<Vec<AcousticMatch>> {
-    let diarization_base = diarization_url();
+    let gpu_base = diarization_url();
 
     // Group diarization segments by speaker, pick the longest for each
     let mut speaker_best: HashMap<String, &DiarSegment> = HashMap::new();
@@ -230,6 +233,7 @@ async fn proactive_acoustic_match(
             continue;
         }
 
+        // Step 1: Call GPU /embed with start_time/end_time to get embedding vector
         let part = reqwest::multipart::Part::bytes(audio_bytes.to_vec())
             .file_name("audio.wav")
             .mime_str("audio/wav")?;
@@ -238,28 +242,44 @@ async fn proactive_acoustic_match(
             .text("start_time", best_seg.start.to_string())
             .text("end_time", best_seg.end.to_string());
 
-        match client
-            .post(format!("{}/voiceprint/identify", diarization_base))
+        let embed_result = client
+            .post(format!("{}/embed", gpu_base))
             .multipart(form)
             .timeout(Duration::from_secs(30))
             .send()
-            .await
-        {
+            .await;
+
+        match embed_result {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(data) = resp.json::<serde_json::Value>().await {
-                    if let Some(match_arr) = data["matches"].as_array() {
-                        if let Some(best) = match_arr.first() {
-                            let name = best["name"]
-                                .as_str()
-                                .unwrap_or("Unknown")
-                                .to_string();
-                            let similarity = best["similarity"].as_f64().unwrap_or(0.0);
-                            matches.push(AcousticMatch {
-                                diarization_speaker: speaker_label.clone(),
-                                matched_name: name,
-                                cosine_similarity: similarity,
-                                confirmed: similarity >= 0.85,
-                            });
+                    let embedding: Vec<f32> = data["embedding"]
+                        .as_array()
+                        .map(|arr| arr.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect())
+                        .unwrap_or_default();
+
+                    if embedding.is_empty() {
+                        tracing::warn!(job_id = %job_id, speaker = %speaker_label, "Empty embedding from GPU");
+                        continue;
+                    }
+
+                    // Step 2: Local voiceprint store lookup
+                    match voiceprint_store.identify(&embedding, 3).await {
+                        Ok(vp_matches) => {
+                            if let Some(best) = vp_matches.first() {
+                                matches.push(AcousticMatch {
+                                    diarization_speaker: speaker_label.clone(),
+                                    matched_name: best.name.clone(),
+                                    cosine_similarity: best.similarity,
+                                    confirmed: best.similarity >= 0.85,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                job_id = %job_id,
+                                speaker = %speaker_label,
+                                "Zvec identify failed: {e}"
+                            );
                         }
                     }
                 }
@@ -269,14 +289,14 @@ async fn proactive_acoustic_match(
                 tracing::warn!(
                     job_id = %job_id,
                     speaker = %speaker_label,
-                    "Voiceprint identify returned {status}"
+                    "GPU /embed returned {status}"
                 );
             }
             Err(e) => {
                 tracing::warn!(
                     job_id = %job_id,
                     speaker = %speaker_label,
-                    "Voiceprint identify failed: {e}"
+                    "GPU /embed failed: {e}"
                 );
             }
         }

@@ -20,15 +20,27 @@ use uuid::Uuid;
 
 use super::orchestrator::run_pipeline;
 use super::types::*;
+use super::voiceprint::SharedVoiceprintStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use reqwest;
 
+// ─── App state ──────────────────────────────────────────────────────
+
+#[derive(Clone)]
+pub struct AppState {
+    pub jobs: JobStore,
+    pub voiceprints: SharedVoiceprintStore,
+}
+
 // ─── Router ─────────────────────────────────────────────────────────
 
-pub fn router() -> Router {
-    let store: JobStore = Arc::new(RwLock::new(std::collections::HashMap::new()));
+pub fn router(voiceprint_store: SharedVoiceprintStore) -> Router {
+    let state = AppState {
+        jobs: Arc::new(RwLock::new(std::collections::HashMap::new())),
+        voiceprints: voiceprint_store,
+    };
 
     Router::new()
         .route("/api/jobs", post(create_job))
@@ -36,13 +48,13 @@ pub fn router() -> Router {
         .route("/api/jobs/{id}/result", get(poll_job))
         .route("/api/speakers/enroll", post(enroll_speaker))
         .route("/api/speakers", get(list_speakers))
-        .with_state(store)
+        .with_state(state)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────
 
 async fn create_job(
-    State(store): State<JobStore>,
+    State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let mut audio_bytes = Vec::new();
@@ -89,20 +101,21 @@ async fn create_job(
         tx: tx.clone(),
         result: result.clone(),
     };
-    store.write().await.insert(job_id.clone(), handle);
+    state.jobs.write().await.insert(job_id.clone(), handle);
 
     tracing::info!(job_id = %job_id, bytes = audio_bytes.len(), attendees = attendees.len(), "Job created");
 
-    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone(), attendees));
+    let voiceprints = state.voiceprints.clone();
+    tokio::spawn(run_pipeline(tx, result, audio_bytes, job_id.clone(), attendees, voiceprints));
 
     Ok(Json(serde_json::json!({ "job_id": job_id })))
 }
 
 async fn stream_job(
-    State(store): State<JobStore>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let rx = store.read().await.get(&id).map(|h| h.tx.subscribe());
+    let rx = state.jobs.read().await.get(&id).map(|h| h.tx.subscribe());
 
     match rx {
         Some(rx) => {
@@ -116,10 +129,10 @@ async fn stream_job(
 }
 
 async fn poll_job(
-    State(store): State<JobStore>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match store.read().await.get(&id) {
+    match state.jobs.read().await.get(&id) {
         Some(h) => Json(h.result.read().await.clone()).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
@@ -128,6 +141,7 @@ async fn poll_job(
 // ─── Speaker enrollment proxy endpoints ─────────────────────────────
 
 async fn enroll_speaker(
+    State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let mut audio_bytes: Option<Vec<u8>> = None;
@@ -160,6 +174,7 @@ async fn enroll_speaker(
         audio_bytes.ok_or((StatusCode::BAD_REQUEST, "No audio field".to_string()))?;
     let name = name.ok_or((StatusCode::BAD_REQUEST, "No name field".to_string()))?;
 
+    // Step 1: Call GPU /embed to extract embedding
     let gpu_url = diarization_url();
     let client = reqwest::Client::new();
 
@@ -167,12 +182,10 @@ async fn enroll_speaker(
         .file_name("enroll.wav")
         .mime_str("audio/wav")
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let form = reqwest::multipart::Form::new()
-        .part("audio", part)
-        .text("name", name.clone());
+    let form = reqwest::multipart::Form::new().part("audio", part);
 
     let resp = client
-        .post(format!("{}/voiceprint/enroll", gpu_url))
+        .post(format!("{}/embed", gpu_url))
         .multipart(form)
         .timeout(Duration::from_secs(60))
         .send()
@@ -184,44 +197,45 @@ async fn enroll_speaker(
         let body = resp.text().await.unwrap_or_default();
         return Err((
             StatusCode::BAD_GATEWAY,
-            format!("GPU enrollment returned {status}: {body}"),
+            format!("GPU /embed returned {status}: {body}"),
         ));
     }
 
-    let data: serde_json::Value = resp
+    let embed_data: serde_json::Value = resp
         .json()
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid GPU response: {e}")))?;
 
-    Ok(Json(data))
+    let embedding: Vec<f32> = embed_data["embedding"]
+        .as_array()
+        .ok_or((StatusCode::BAD_GATEWAY, "No embedding in response".to_string()))?
+        .iter()
+        .filter_map(|v| v.as_f64().map(|f| f as f32))
+        .collect();
+
+    // Step 2: Store in local voiceprint store
+    let speaker_id = state
+        .voiceprints
+        .enroll(&name, &embedding)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Voiceprint enroll failed: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "speaker_id": speaker_id,
+        "name": name,
+    })))
 }
 
-async fn list_speakers() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let gpu_url = diarization_url();
-    let client = reqwest::Client::new();
-
-    let resp = client
-        .get(format!("{}/voiceprint/speakers", gpu_url))
-        .timeout(Duration::from_secs(10))
-        .send()
+async fn list_speakers(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let speakers = state
+        .voiceprints
+        .list_speakers()
         .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("GPU service unreachable: {e}")))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Voiceprint list failed: {e}")))?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err((
-            StatusCode::BAD_GATEWAY,
-            format!("GPU speakers returned {status}: {body}"),
-        ));
-    }
-
-    let data: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid GPU response: {e}")))?;
-
-    Ok(Json(data))
+    Ok(Json(serde_json::json!({ "speakers": speakers })))
 }
 
 // ─── SSE stream adapter ────────────────────────────────────────────
