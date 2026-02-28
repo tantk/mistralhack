@@ -40,7 +40,11 @@ def extract_embedding(audio_16k: np.ndarray) -> np.ndarray:
 
     if backend == "funasr":
         result = model.generate(input=audio_16k, output_dir=None)
-        emb = np.array(result[0]["spk_embedding"]).flatten()
+        raw_emb = result[0]["spk_embedding"]
+        # FunASR may return a GPU tensor — move to CPU before numpy conversion
+        if hasattr(raw_emb, "cpu"):
+            raw_emb = raw_emb.cpu().numpy()
+        emb = np.array(raw_emb).flatten()
     else:
         import torch
         waveform = torch.from_numpy(audio_16k).unsqueeze(0).float()
