@@ -5,7 +5,7 @@
 # Usage: Right-click -> Run with PowerShell (as Admin)
 #   or:  powershell -ExecutionPolicy Bypass -File update-portproxy.ps1
 
-$Port = 8080
+$Ports = @(8080, 8001)
 
 # Get the current WSL2 IP
 $WslIp = (wsl hostname -I).Trim().Split(" ")[0]
@@ -17,17 +17,18 @@ if (-not $WslIp) {
 
 Write-Host "Current WSL2 IP: $WslIp" -ForegroundColor Cyan
 
-# Remove existing port proxy rule (ignore errors if it doesn't exist)
-netsh interface portproxy delete v4tov4 listenport=$Port listenaddress=0.0.0.0 2>$null
+foreach ($Port in $Ports) {
+    # Remove existing port proxy rule (ignore errors if it doesn't exist)
+    netsh interface portproxy delete v4tov4 listenport=$Port listenaddress=0.0.0.0 2>$null
 
-# Add updated port proxy rule
-netsh interface portproxy add v4tov4 listenport=$Port listenaddress=0.0.0.0 connectport=$Port connectaddress=$WslIp
+    # Add updated port proxy rule
+    netsh interface portproxy add v4tov4 listenport=$Port listenaddress=0.0.0.0 connectport=$Port connectaddress=$WslIp
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "OK: Port $Port forwarded to WSL2 at $WslIp" -ForegroundColor Green
-} else {
-    Write-Host "FAIL: Could not update port proxy" -ForegroundColor Red
-    exit 1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "OK: Port $Port forwarded to WSL2 at $WslIp" -ForegroundColor Green
+    } else {
+        Write-Host "FAIL: Could not update port proxy for port $Port" -ForegroundColor Red
+    }
 }
 
 # Show current rules

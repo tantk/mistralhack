@@ -1,6 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
 
+# Patch torchaudio for SpeechBrain compatibility with torchaudio 2.10+
+import torchaudio
+if not hasattr(torchaudio, "list_audio_backends"):
+    torchaudio.list_audio_backends = lambda: ["torchcodec"]
+
 import torch
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
@@ -15,10 +20,9 @@ logger = logging.getLogger("gpu_service")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Pre-loading models...")
+    logger.info("Pre-loading diarization pipeline...")
     get_pipeline()
-    get_extractor()
-    logger.info("Models ready.")
+    logger.info("Diarization pipeline ready. Embedding extractor will lazy-load on first request.")
     yield
 
 

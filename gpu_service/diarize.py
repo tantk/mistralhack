@@ -18,7 +18,7 @@ def get_pipeline() -> PyannotePipeline:
     if _pipeline is None:
         _pipeline = PyannotePipeline.from_pretrained(
             PYANNOTE_MODEL,
-            use_auth_token=HF_TOKEN,
+            token=HF_TOKEN,
         )
         if torch.cuda.is_available():
             _pipeline = _pipeline.to(torch.device("cuda"))

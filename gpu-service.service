@@ -1,0 +1,18 @@
+[Unit]
+Description=GPU Diarization & Embedding Service
+After=network.target
+
+[Service]
+Type=simple
+User=titan
+WorkingDirectory=/mnt/c/dev/mistralhack
+Environment=PATH=/mnt/c/dev/mistralhack/gpu_service/.venv/bin:/usr/local/cuda-12.6/bin:/usr/lib/wsl/lib:/usr/bin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/usr/lib/wsl/lib
+EnvironmentFile=/mnt/c/dev/mistralhack/.env
+Environment=GPU_SERVICE_PORT=8001
+ExecStart=/mnt/c/dev/mistralhack/gpu_service/.venv/bin/python -m gpu_service.server
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -6,7 +6,7 @@ GPU_SERVICE_PORT = int(os.getenv("GPU_SERVICE_PORT", "8001"))
 
 # Pyannote (gated model — requires HF_TOKEN)
 HF_TOKEN = os.getenv("HF_TOKEN", "")
-PYANNOTE_MODEL = "pyannote/speaker-diarization-4"
+PYANNOTE_MODEL = "pyannote/speaker-diarization-community-1"
 PYANNOTE_MIN_SPEAKERS = int(os.getenv("PYANNOTE_MIN_SPEAKERS", "1"))
 PYANNOTE_MAX_SPEAKERS = int(os.getenv("PYANNOTE_MAX_SPEAKERS", "10"))
 
