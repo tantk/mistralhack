@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y ca-certificates libstdc++6 libssl3t64 && rm -rf /var/lib/apt/lists/*
-RUN useradd -m -u 1000 app
+RUN useradd -m -o -u 1000 app
 USER 1000
 WORKDIR /home/app
 COPY orchestrator ./orchestrator
