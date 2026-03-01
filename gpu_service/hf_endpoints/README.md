@@ -1,18 +1,22 @@
 ---
 tags:
   - audio
+  - speech-to-text
   - speaker-diarization
   - speaker-embedding
+  - voxtral
   - pyannote
   - funasr
   - meetingmind
 library_name: custom
-pipeline_tag: audio-classification
+pipeline_tag: automatic-speech-recognition
 ---
 
-# MeetingMind GPU Service
+# MeetingMind GPU Endpoint
 
-GPU-accelerated speaker diarization and embedding extraction for the MeetingMind pipeline. Runs as an HF Inference Endpoint on a T4 GPU with scale-to-zero.
+GPU-accelerated speech-to-text, speaker diarization, and embedding extraction for the MeetingMind pipeline. Runs as an HF Inference Endpoint on a T4 GPU with scale-to-zero.
+
+**Model weights**: [`mistral-hackaton-2026/voxtral_model`](https://huggingface.co/mistral-hackaton-2026/voxtral_model) — Voxtral Realtime 4B (BF16 safetensors, loaded from `/repository/voxtral-model/`)
 
 ## API
 
@@ -27,6 +31,34 @@ curl -H "Authorization: Bearer $HF_TOKEN" $ENDPOINT_URL/health
 ```json
 {"status": "ok", "gpu_available": true}
 ```
+
+### `POST /transcribe`
+
+Speech-to-text using Voxtral Realtime 4B. Returns full transcription.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  -F audio=@speech.wav \
+  $ENDPOINT_URL/transcribe
+```
+
+```json
+{"text": "Hello, this is a test of the voxtral speech to text system."}
+```
+
+### `POST /transcribe/stream`
+
+Streaming speech-to-text via SSE. Tokens are emitted as they are generated.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  -F audio=@speech.wav \
+  $ENDPOINT_URL/transcribe/stream
+```
+
+Events: `token` (partial), `done` (final text), `error`.
 
 ### `POST /diarize`
 
@@ -72,13 +104,14 @@ curl -X POST \
 | Variable | Default | Description |
 |---|---|---|
 | `HF_TOKEN` | (required) | Hugging Face token for pyannote model access |
+| `VOXTRAL_MODEL_DIR` | `/repository/voxtral-model` | Path to Voxtral model weights |
 | `PYANNOTE_MIN_SPEAKERS` | `1` | Minimum speakers for diarization |
 | `PYANNOTE_MAX_SPEAKERS` | `10` | Maximum speakers for diarization |
 
 ## Architecture
 
 - **Base image**: `pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime`
+- **Transcription**: Voxtral Realtime 4B via direct safetensors loading (~8GB VRAM)
 - **Diarization**: pyannote/speaker-diarization-community-1 (~2GB VRAM)
 - **Embeddings**: FunASR CAM++ sv_zh-cn_16k-common (~200MB)
-- **Total VRAM**: ~3GB (fits T4 16GB with headroom)
 - **Scale-to-zero**: 15 min idle timeout (~$0.60/hr when active)

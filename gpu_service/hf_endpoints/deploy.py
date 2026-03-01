@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build, push, and deploy the meetingmind-gpu Docker image to HF Inference Endpoints.
+Build, push, and deploy the gpu_endpoint Docker image to HF Inference Endpoints.
 
 Usage:
     export HF_TOKEN=hf_...
@@ -17,9 +17,8 @@ from huggingface_hub import HfApi
 # Config
 # ---------------------------------------------------------------------------
 DOCKER_IMAGE = "tantk/meetingmind-gpu:latest"
-REPO_ID = "mistral-hackaton-2026/meetingmind-gpu"
+REPO_ID = "tantk/gpu_endpoint"
 ENDPOINT_NAME = "meetingmind-gpu"
-NAMESPACE = "mistral-hackaton-2026"
 
 
 def run(cmd: list[str], **kwargs) -> None:
@@ -57,7 +56,7 @@ def main() -> None:
     print("\n=== Creating inference endpoint ===")
     endpoint = api.create_inference_endpoint(
         name=ENDPOINT_NAME,
-        namespace=NAMESPACE,
+        namespace="tantk",
         repository=REPO_ID,
         framework="custom",
         task="custom",
