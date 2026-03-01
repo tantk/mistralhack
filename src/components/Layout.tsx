@@ -84,10 +84,10 @@ function PipelineSidebar() {
                 {!isLast && (
                   <div
                     className={`absolute left-[15px] top-[32px] bottom-0 w-[2px] ${status === 'done'
-                        ? 'bg-accent'
-                        : status === 'active'
-                          ? 'bg-accent/20 pipeline-shimmer'
-                          : 'bg-slate-800'
+                      ? 'bg-accent'
+                      : status === 'active'
+                        ? 'bg-accent/20 pipeline-shimmer'
+                        : 'bg-slate-800'
                       }`}
                   />
                 )}
@@ -161,7 +161,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               </svg>
             </div>
             <h2 className="text-slate-100 text-lg font-bold leading-tight tracking-tight">
-              MeetingIntel AI
+              Make Meeting Analyses Great Again
             </h2>
           </div>
           {/* Search */}

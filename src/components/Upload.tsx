@@ -84,7 +84,7 @@ export default function Upload() {
             </svg>
           </div>
           <span className="font-display font-bold text-xl tracking-tight text-slate-100">
-            MeetingIntel AI
+            Make Meeting Analyses Great Again
           </span>
         </div>
 
@@ -125,7 +125,7 @@ export default function Upload() {
                   Drop audio or video file here
                 </p>
                 <p className="text-xs tracking-widest text-slate-600 uppercase">
-                  WAV · MP3 · MP4 · M4A
+                  WAV  MP3  MP4  M4A
                 </p>
               </motion.div>
             ) : (
