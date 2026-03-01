@@ -332,10 +332,10 @@ async fn call_gpu_transcribe(audio: &[u8]) -> anyhow::Result<String> {
         .mime_str("audio/wav")?;
     let form = reqwest::multipart::Form::new().part("audio", part);
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/transcribe", diarization_url()))
         .multipart(form)
-        .timeout(Duration::from_secs(300))
+        .timeout(Duration::from_secs(300)))
         .send()
         .await?;
 
@@ -499,10 +499,10 @@ pub async fn call_voxtral(
         .mime_str("audio/wav")?;
     let form = reqwest::multipart::Form::new().part("audio", part);
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/transcribe/stream", voxtral_url()))
         .multipart(form)
-        .timeout(Duration::from_secs(300))
+        .timeout(Duration::from_secs(300)))
         .send()
         .await?;
 
@@ -574,10 +574,10 @@ pub(super) async fn call_voxtral_non_streaming(audio: &[u8]) -> anyhow::Result<S
         .mime_str("audio/wav")?;
     let form = reqwest::multipart::Form::new().part("audio", part);
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/transcribe", voxtral_url()))
         .multipart(form)
-        .timeout(Duration::from_secs(300))
+        .timeout(Duration::from_secs(300)))
         .send()
         .await?;
 

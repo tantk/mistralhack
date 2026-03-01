@@ -326,10 +326,10 @@ async fn call_embed_and_identify(
         .text("start_time", start.to_string())
         .text("end_time", end.to_string());
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/embed", diarization_url))
         .multipart(form)
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(30)))
         .send()
         .await?;
 

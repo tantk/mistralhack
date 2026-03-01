@@ -195,7 +195,7 @@ async fn enroll_speaker(
     let name = name.ok_or((StatusCode::BAD_REQUEST, "No name field".to_string()))?;
 
     // Step 1: Call GPU /embed to extract embedding
-    let gpu_url = diarization_url();
+    let gpu_url = embedding_url();
     let client = reqwest::Client::new();
 
     let part = reqwest::multipart::Part::bytes(audio_bytes)
@@ -204,10 +204,10 @@ async fn enroll_speaker(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let form = reqwest::multipart::Form::new().part("audio", part);
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/embed", gpu_url))
         .multipart(form)
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(60)))
         .send()
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("GPU service unreachable: {e}")))?;

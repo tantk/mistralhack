@@ -1,18 +1,52 @@
-name: Deploy to HF Space
+name: Build & Deploy to HF Space
 
 on:
   push:
     branches: [master]
 
 jobs:
-  deploy:
+  build-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (cached)
+        uses: docker/build-push-action@v6
         with:
-          fetch-depth: 0
-          lfs: true
+          context: .
+          load: true
+          tags: meetingmind:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract artifacts
+        run: |
+          docker create --name mm meetingmind:latest
+          mkdir -p deploy/static
+          docker cp mm:/home/app/orchestrator deploy/orchestrator
+          docker cp mm:/home/app/static/. deploy/static/
+          docker rm mm
+          strip deploy/orchestrator
+          ls -lh deploy/orchestrator
+
+      - name: Prepare HF deployment
+        run: |
+          cp README.md deploy/
+          cp Dockerfile.hf deploy/Dockerfile
+
       - name: Push to Hugging Face Space
-        run: git push https://user:$HF_TOKEN@huggingface.co/spaces/mistral-hackaton-2026/meetingmind master:main --force
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd deploy
+          git init
+          git lfs install
+          git lfs track "orchestrator"
+          git add .
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git commit -m "Deploy $(git -C $GITHUB_WORKSPACE rev-parse --short HEAD)"
+          git push --force https://user:$HF_TOKEN@huggingface.co/spaces/mistral-hackaton-2026/meetingmind main
