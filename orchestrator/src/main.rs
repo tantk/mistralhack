@@ -80,17 +80,8 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Restore voiceprints from HF backup (if available)
-    let store_path = pipeline::voiceprint::store_path();
-    if let Err(e) = pipeline::hf_backup::restore_from_hf(&store_path).await {
-        tracing::warn!("Voiceprint restore failed (proceeding with empty store): {e}");
-    }
-
-    // Initialize voiceprint store
-    let voiceprint_store = Arc::new(
-        pipeline::voiceprint::VoiceprintStore::init(&store_path)
-            .expect("Failed to initialize voiceprint store"),
-    );
+    // Initialize voiceprint store (remote HTTP client to vectordb Space)
+    let voiceprint_store = Arc::new(pipeline::voiceprint::VoiceprintStore::new());
 
     // Auth only gates /api/ routes (not static files)
     let api = pipeline::router(voiceprint_store)

@@ -7,6 +7,5 @@ pub mod alignment;
 pub mod agent;
 pub mod analysis;
 pub mod voiceprint;
-pub mod hf_backup;
 
 pub use routes::router;

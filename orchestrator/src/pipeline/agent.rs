@@ -347,7 +347,7 @@ async fn call_embed_and_identify(
         .filter_map(|v| v.as_f64().map(|f| f as f32))
         .collect();
 
-    let matches = voiceprint_store.identify(&embedding, 3)?;
+    let matches = voiceprint_store.identify(&embedding, 3).await?;
     let matches_json: Vec<serde_json::Value> = matches
         .iter()
         .map(|m| {

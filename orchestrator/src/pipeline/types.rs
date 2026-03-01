@@ -13,6 +13,10 @@ pub fn diarization_url() -> String {
     env::var("DIARIZATION_URL").unwrap_or_else(|_| "http://192.168.0.105:8001".into())
 }
 
+pub fn embedding_url() -> String {
+    diarization_url()
+}
+
 pub fn gpu_token() -> String {
     env::var("GPU_TOKEN").unwrap_or_default()
 }
