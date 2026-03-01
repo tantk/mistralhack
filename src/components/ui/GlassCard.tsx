@@ -14,15 +14,15 @@ const GLOW = {
 } as const
 
 const BORDER = {
-  cyan: 'border-l-2 border-l-neon-cyan',
-  magenta: 'border-l-2 border-l-neon-magenta',
-  yellow: 'border-l-2 border-l-neon-yellow',
+  cyan: 'border-l-2 border-l-accent',
+  magenta: 'border-l-2 border-l-danger',
+  yellow: 'border-l-2 border-l-warning',
 } as const
 
 export default function GlassCard({ children, className = '', glow, borderAccent }: GlassCardProps) {
   return (
     <div
-      className={`glass-panel ${glow ? GLOW[glow] : ''} ${borderAccent ? BORDER[borderAccent] : ''} ${className}`}
+      className={`card-surface ${glow ? GLOW[glow] : ''} ${borderAccent ? BORDER[borderAccent] : ''} ${className}`}
     >
       {children}
     </div>

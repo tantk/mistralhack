@@ -45,31 +45,31 @@ export default function Timeline() {
       <AudioPlayer seekTo={seekTo} />
 
       {/* Time axis */}
-      <div className="relative h-7 border-b border-glass-border bg-surface ml-[150px] mr-5">
+      <div className="relative h-7 border-b border-accent/10 bg-bg-surface ml-[150px] mr-5">
         {ticks.map((t) => (
           <div
             key={t}
-            className="absolute top-0 bottom-0 w-px bg-glass-border -translate-x-1/2"
+            className="absolute top-0 bottom-0 w-px bg-accent/10 -translate-x-1/2"
             style={{ left: pct(t) }}
           >
-            <span className="absolute top-1.5 left-1 font-code text-[10px] text-zinc-600 whitespace-nowrap">
+            <span className="absolute top-1.5 left-1 font-mono text-[10px] text-slate-600 whitespace-nowrap">
               {fmt(t)}
             </span>
           </div>
         ))}
-        <div className="absolute right-1 top-1.5 font-code text-[10px] text-zinc-500">
+        <div className="absolute right-1 top-1.5 font-mono text-[10px] text-slate-500">
           {fmt(total)}
         </div>
       </div>
 
       {/* Speaker lanes */}
-      <div className="py-2 pr-5 flex flex-col gap-1 grid-bg">
+      <div className="py-2 pr-5 flex flex-col gap-1">
         {speakers.map((spk) => {
           const color = speakerColor(spk, speakers)
           return (
             <div key={spk} className="flex items-center h-8">
               <div
-                className="w-[150px] flex-shrink-0 font-hud text-xs font-semibold tracking-wide pr-3 text-right whitespace-nowrap overflow-hidden text-ellipsis"
+                className="w-[150px] flex-shrink-0 font-display text-xs font-semibold tracking-wide pr-3 text-right whitespace-nowrap overflow-hidden text-ellipsis"
                 style={{ color }}
               >
                 {spk}
@@ -102,7 +102,7 @@ export default function Timeline() {
         {decisions.map((d: Decision, i) => (
           <button
             key={`d${i}`}
-            className="absolute top-0 -translate-x-1/2 font-code text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 bg-neon-yellow/15 text-neon-yellow border border-neon-yellow/30"
+            className="absolute top-0 -translate-x-1/2 font-mono text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 bg-warning/15 text-warning border border-warning/30"
             style={{ left: pct(d.timestamp) }}
             title={d.summary}
             onClick={() => handleSegmentClick(d.timestamp)}
@@ -116,7 +116,7 @@ export default function Timeline() {
         {ambiguities.map((a: Ambiguity, i) => (
           <button
             key={`a${i}`}
-            className="absolute top-0 -translate-x-1/2 font-code text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 bg-neon-magenta/12 text-neon-magenta border border-neon-magenta/25 animate-glow-pulse"
+            className="absolute top-0 -translate-x-1/2 font-mono text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 bg-danger/12 text-danger border border-danger/25 animate-glow-pulse"
             style={{ left: pct(a.timestamp) }}
             title={a.quote}
             onClick={() => handleSegmentClick(a.timestamp)}
