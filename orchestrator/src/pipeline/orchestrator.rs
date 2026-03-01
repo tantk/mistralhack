@@ -134,12 +134,14 @@ pub async fn run_pipeline(
     result.write().await.phase = Some("resolving".into());
 
     let gpu_available = gpu_health.check_now().await;
+    let mut used_threshold_fallback = false;
     let (resolved_segments, agent_action_items) =
         match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees, &voiceprint_store, gpu_available).await {
             Ok((segs, items)) => (segs, items),
             Err(e) => {
                 tracing::warn!(job_id = %job_id, "Agent resolution failed, applying threshold fallback: {e}");
                 // Threshold fallback: apply acoustic matches with similarity >= 0.85
+                used_threshold_fallback = true;
                 let fallback_segments =
                     apply_threshold_fallback(&segments, &acoustic_matches, &tx);
                 (fallback_segments, Vec::new())
@@ -147,6 +149,9 @@ pub async fn run_pipeline(
         };
 
     result.write().await.segments = Some(resolved_segments.clone());
+    let _ = tx.send(PipelineEvent::SegmentsResolved {
+        segments: resolved_segments.clone(),
+    });
 
     // ── Phase 4: Analysis ──
     let _ = tx.send(PipelineEvent::PhaseStart {
@@ -172,7 +177,11 @@ pub async fn run_pipeline(
     let meeting_dynamics = compute_meeting_dynamics(&resolved_segments);
 
     // Build speakers array from resolved segments + acoustic matches
-    let speakers = build_speakers_array(&resolved_segments, &acoustic_matches);
+    let speakers = build_speakers_array(
+        &resolved_segments,
+        &acoustic_matches,
+        used_threshold_fallback,
+    );
 
     // Build meeting metadata
     let meeting_metadata = MeetingMetadata {
@@ -484,13 +493,21 @@ fn apply_threshold_fallback(
 fn build_speakers_array(
     segments: &[Segment],
     acoustic_matches: &[AcousticMatch],
+    used_threshold_fallback: bool,
 ) -> Vec<SpeakerInfo> {
     let mut seen: HashMap<String, SpeakerInfo> = HashMap::new();
 
-    // Build acoustic lookup
-    let acoustic_map: HashMap<String, &AcousticMatch> = acoustic_matches
+    // Build acoustic lookup keyed by diarization_speaker (e.g. "SPEAKER_00")
+    let acoustic_by_diar: HashMap<String, &AcousticMatch> = acoustic_matches
         .iter()
         .map(|m| (m.diarization_speaker.clone(), m))
+        .collect();
+
+    // Build reverse lookup: matched_name -> AcousticMatch so we can find
+    // acoustic data even after the agent resolves "SPEAKER_00" -> "Alice"
+    let acoustic_by_name: HashMap<String, &AcousticMatch> = acoustic_matches
+        .iter()
+        .map(|m| (m.matched_name.clone(), m))
         .collect();
 
     for seg in segments {
@@ -498,18 +515,27 @@ fn build_speakers_array(
             continue;
         }
 
+        // Try both lookups: diarization label (unresolved) or resolved name
+        let acoustic = acoustic_by_diar
+            .get(&seg.speaker)
+            .or_else(|| acoustic_by_name.get(&seg.speaker))
+            .copied();
+
         // Determine resolution method and acoustic confidence
-        let (acoustic_confidence, resolution_method) =
-            if let Some(m) = acoustic_map.get(&seg.speaker) {
-                (Some(m.cosine_similarity), "agent+acoustic".to_string())
+        let (acoustic_confidence, resolution_method) = if let Some(m) = acoustic {
+            if seg.speaker.starts_with("SPEAKER_") {
+                // Resolved only by acoustic threshold fallback
+                (Some(m.cosine_similarity), "acoustic".to_string())
+            } else if used_threshold_fallback {
+                (Some(m.cosine_similarity), "threshold_fallback".to_string())
             } else {
-                // Check if speaker name looks resolved (not SPEAKER_XX pattern)
-                if seg.speaker.starts_with("SPEAKER_") {
-                    (None, "unresolved".to_string())
-                } else {
-                    (None, "agent".to_string())
-                }
-            };
+                (Some(m.cosine_similarity), "agent+acoustic".to_string())
+            }
+        } else if seg.speaker.starts_with("SPEAKER_") {
+            (None, "unresolved".to_string())
+        } else {
+            (None, "agent".to_string())
+        };
 
         seen.insert(
             seg.speaker.clone(),
@@ -538,4 +564,64 @@ pub async fn set_error(
     r.error = Some(msg.into());
     r.phase = None;
     let _ = tx.send(PipelineEvent::Done);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn segment(speaker: &str) -> Segment {
+        Segment {
+            speaker: speaker.to_string(),
+            start: 0.0,
+            end: 1.0,
+            text: "hello".to_string(),
+            is_overlap: false,
+            confidence: 1.0,
+            active_speakers: Vec::new(),
+        }
+    }
+
+    fn acoustic(diarization_speaker: &str, matched_name: &str, cosine_similarity: f64) -> AcousticMatch {
+        AcousticMatch {
+            diarization_speaker: diarization_speaker.to_string(),
+            matched_name: matched_name.to_string(),
+            cosine_similarity,
+            confirmed: cosine_similarity >= 0.85,
+        }
+    }
+
+    #[test]
+    fn build_speakers_array_uses_reverse_lookup_after_agent_resolution() {
+        let segments = vec![segment("Alice")];
+        let acoustic_matches = vec![acoustic("SPEAKER_00", "Alice", 0.92)];
+
+        let speakers = build_speakers_array(&segments, &acoustic_matches, false);
+        assert_eq!(speakers.len(), 1);
+        assert_eq!(speakers[0].name, "Alice");
+        assert_eq!(speakers[0].resolution_method, "agent+acoustic");
+        assert!((speakers[0].acoustic_confidence.unwrap_or_default() - 0.92).abs() < 1e-9);
+    }
+
+    #[test]
+    fn build_speakers_array_marks_threshold_fallback_provenance() {
+        let segments = vec![segment("Alice")];
+        let acoustic_matches = vec![acoustic("SPEAKER_00", "Alice", 0.92)];
+
+        let speakers = build_speakers_array(&segments, &acoustic_matches, true);
+        assert_eq!(speakers.len(), 1);
+        assert_eq!(speakers[0].name, "Alice");
+        assert_eq!(speakers[0].resolution_method, "threshold_fallback");
+        assert!((speakers[0].acoustic_confidence.unwrap_or_default() - 0.92).abs() < 1e-9);
+    }
+
+    #[test]
+    fn build_speakers_array_marks_unresolved_without_acoustic_match() {
+        let segments = vec![segment("SPEAKER_00")];
+        let speakers = build_speakers_array(&segments, &[], false);
+        assert_eq!(speakers.len(), 1);
+        assert_eq!(speakers[0].name, "SPEAKER_00");
+        assert_eq!(speakers[0].resolution_method, "unresolved");
+        assert!(speakers[0].acoustic_confidence.is_none());
+    }
 }

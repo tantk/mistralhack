@@ -5,7 +5,6 @@ import Icon from './ui/Icon'
 
 /** Parse transcript into speaker-attributed segments for display */
 function parseTranscriptBlocks(transcript: string) {
-  // Try to parse "[Speaker]: text" lines
   const lines = transcript.split('\n').filter(Boolean)
   const blocks: { speaker: string; text: string; time?: string }[] = []
 
@@ -30,7 +29,6 @@ function LiveTranscriptStream() {
 
   return (
     <div className="flex-1 card-surface flex flex-col overflow-hidden shadow-glow-cyan">
-      {/* Header bar */}
       <div className="p-4 border-b border-accent/10 bg-accent/5 flex justify-between items-center">
         <h3 className="text-sm font-bold text-accent flex items-center gap-2">
           <Icon name="stream" size={18} />
@@ -41,7 +39,6 @@ function LiveTranscriptStream() {
         </span>
       </div>
 
-      {/* Transcript content */}
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar flex flex-col gap-4">
         {!hasContent && (
           <div className="flex-1 flex items-center justify-center">
@@ -86,7 +83,6 @@ function LiveTranscriptStream() {
           </div>
         ) : null}
 
-        {/* Audio capture indicator */}
         <div className="mt-auto pt-4 flex items-center gap-2 text-accent animate-pulse">
           <Icon name="keyboard_voice" size={16} />
           <span className="text-xs font-medium">Capturing audio stream...</span>
@@ -102,20 +98,17 @@ function LiveTranscriptStream() {
 }
 
 function LiveAgentActivity() {
-  const { toolCalls, speakerResolutions, phase } = useStore()
+  const { toolCalls, speakerResolutions, acousticMatches, phase } = useStore()
   const recentToolCalls = toolCalls.slice(-8)
 
   return (
     <div className="flex flex-col h-full card-surface overflow-hidden shadow-glow-cyan">
-      {/* Header */}
       <div className="p-4 border-b border-accent/10 bg-slate-900/50 flex items-center gap-2">
         <Icon name="smart_toy" size={20} className="text-accent" />
         <h3 className="text-sm font-bold text-slate-100">Live Agent Activity</h3>
       </div>
 
-      {/* Activity cards */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
-        {/* Speaker Resolutions */}
         {speakerResolutions.map((sr, i) => (
           <motion.div
             key={`sr-${i}`}
@@ -131,7 +124,7 @@ function LiveAgentActivity() {
               </span>
             </div>
             <p className="text-xs text-slate-300">
-              {sr.label} → <span className="text-slate-100 font-medium">{sr.name}</span>
+              {sr.label} -&gt; <span className="text-slate-100 font-medium">{sr.name}</span>
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
@@ -144,7 +137,6 @@ function LiveAgentActivity() {
           </motion.div>
         ))}
 
-        {/* Tool calls as agent activities */}
         {recentToolCalls.map((tc, i) => {
           const isRecent = i >= recentToolCalls.length - 2
           return (
@@ -168,7 +160,7 @@ function LiveAgentActivity() {
                 {JSON.stringify(tc.args).length > 100 ? '...' : ''}
               </p>
               {tc.result && (
-                <p className="text-xs text-slate-400 truncate">→ {tc.result.slice(0, 80)}</p>
+                <p className="text-xs text-slate-400 truncate">-&gt; {tc.result.slice(0, 80)}</p>
               )}
               {isRecent && !tc.result && (
                 <div className="flex gap-2">
@@ -181,8 +173,25 @@ function LiveAgentActivity() {
           )
         })}
 
-        {/* Empty state */}
-        {recentToolCalls.length === 0 && speakerResolutions.length === 0 && (
+        {acousticMatches.length > 0 && (
+          <div className="p-3 rounded-lg bg-slate-900 border border-slate-800" data-testid="acoustic-matches-panel">
+            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Acoustic Match Candidates</p>
+            <div className="space-y-1.5">
+              {acousticMatches.map((m, i) => (
+                <div key={`${m.diarization_speaker}-${m.matched_name}-${i}`} className="flex justify-between gap-3 text-xs font-mono">
+                  <span className="text-slate-300 truncate">
+                    {m.diarization_speaker} -&gt; {m.matched_name}
+                  </span>
+                  <span className={m.confirmed ? 'text-green-400' : 'text-yellow-400'}>
+                    {(m.cosine_similarity * 100).toFixed(0)}% {m.confirmed ? 'confirmed' : 'tentative'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recentToolCalls.length === 0 && speakerResolutions.length === 0 && acousticMatches.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500">
             <Icon name="smart_toy" size={32} className="mb-3 opacity-30" />
             <p className="text-xs">
@@ -202,7 +211,6 @@ export default function Processing() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Session header */}
       <div className="p-6 border-b border-accent/10 flex justify-between items-center bg-bg-primary">
         <div>
           <div className="flex items-center gap-3">
@@ -212,7 +220,7 @@ export default function Processing() {
             </h1>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Session ID: <span className="text-slate-300 font-mono">{jobId?.slice(0, 12) ?? '—'}</span>
+            Session ID: <span className="text-slate-300 font-mono">{jobId?.slice(0, 12) ?? '-'}</span>
           </p>
         </div>
         <div className="flex gap-3">
@@ -227,7 +235,6 @@ export default function Processing() {
         </div>
       </div>
 
-      {/* Two-column content */}
       <div className="flex-1 grid grid-cols-12 gap-6 p-6 overflow-hidden">
         <div className="col-span-12 lg:col-span-7 flex flex-col overflow-hidden">
           <LiveTranscriptStream />

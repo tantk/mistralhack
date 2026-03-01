@@ -361,6 +361,10 @@ fn event_to_sse(ev: &PipelineEvent) -> (&'static str, serde_json::Value) {
             "acoustic_matches_complete",
             serde_json::json!({ "matches": matches }),
         ),
+        PipelineEvent::SegmentsResolved { segments } => (
+            "segments_resolved",
+            serde_json::json!({ "segments": segments }),
+        ),
         PipelineEvent::ToolCall { tool, args } => (
             "tool_call",
             serde_json::json!({ "tool": tool, "args": args }),

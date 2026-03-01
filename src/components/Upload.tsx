@@ -18,8 +18,10 @@ export default function Upload() {
   const [dragOver, setDragOver] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attendeesStr, setAttendeesStr] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const store = useStore()
+  const pipelineError = useStore((s) => s.pipelineError)
 
   const validate = (f: File) => {
     if (!ACCEPTED.includes(f.type) && !ACCEPTED_EXT.some(e => f.name.endsWith(e))) {
@@ -54,9 +56,15 @@ export default function Upload() {
 
   const process = async () => {
     if (!file) return
+    setError(null)
+    store.setPipelineError(null)
     store.setStage('uploading')
     try {
-      const jobId = await submitJob(file)
+      const attendees = attendeesStr
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const jobId = await submitJob(file, attendees)
       store.setJobId(jobId)
       store.setStage('processing')
       store.setPhase('transcribing')
@@ -67,9 +75,8 @@ export default function Upload() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="upload-screen min-h-screen flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-lg flex flex-col items-center gap-6">
-        {/* Logo */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-8 text-accent">
             <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -81,7 +88,6 @@ export default function Upload() {
           </span>
         </div>
 
-        {/* Drop zone */}
         <div
           className={`w-full card-surface transition-all duration-200 cursor-pointer ${dragOver
               ? 'border-accent shadow-glow-cyan'
@@ -119,7 +125,7 @@ export default function Upload() {
                   Drop audio or video file here
                 </p>
                 <p className="text-xs tracking-widest text-slate-600 uppercase">
-                  WAV Â· MP3 Â· MP4 Â· M4A
+                  WAV · MP3 · MP4 · M4A
                 </p>
               </motion.div>
             ) : (
@@ -147,29 +153,38 @@ export default function Upload() {
           </AnimatePresence>
         </div>
 
-        {/* Error */}
         <AnimatePresence>
-          {error && (
+          {(error || pipelineError) && (
             <motion.p
               className="font-mono text-xs text-danger text-center overflow-hidden"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
             >
-              {error}
+              {error || pipelineError}
             </motion.p>
           )}
         </AnimatePresence>
 
-        {/* Process button */}
         <Button
           variant="primary"
-          className="w-full py-3.5 text-sm"
+          className="process-btn w-full py-3.5 text-sm"
           disabled={!file}
           onClick={process}
         >
           PROCESS MEETING
         </Button>
+
+        {file && (
+          <input
+            type="text"
+            className="w-full card-surface px-3 py-2.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 outline-none border border-slate-800 focus:border-accent"
+            placeholder="Attendees (comma-separated, optional)"
+            value={attendeesStr}
+            onChange={(e) => setAttendeesStr(e.target.value)}
+            data-testid="attendees-input"
+          />
+        )}
 
         <p className="text-xs text-slate-600 text-center">
           Audio stays on your server. Nothing leaves your infrastructure.

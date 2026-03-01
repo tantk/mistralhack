@@ -33,3 +33,4 @@ test_server/*_results.json
 dist/
 /.agents
 AGENTS.md
+/.agent
