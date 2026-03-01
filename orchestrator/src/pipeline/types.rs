@@ -262,6 +262,8 @@ pub enum PipelineEvent {
         confidence: f64,
         method: String,
     },
+    #[serde(rename = "segments_resolved")]
+    SegmentsResolved { segments: Vec<Segment> },
     #[serde(rename = "analysis_complete")]
     AnalysisComplete {
         decisions: Vec<Decision>,

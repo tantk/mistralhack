@@ -31,3 +31,6 @@ test_server/*_results.json
 
 # Build output
 dist/
+/.agents
+AGENTS.md
+/.agent

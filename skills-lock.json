@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "playwright-cli": {
+      "source": "microsoft/playwright-cli",
+      "sourceType": "github",
+      "computedHash": "d0c9769e2df40ba1f51660294e6833566cec8a0f8c6a6ef5eb922afe3f573ef6"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

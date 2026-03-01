@@ -79,6 +79,21 @@ export const DiarizationCompleteSchema = z.object({
   segments: z.array(SegmentSchema),
 })
 
+export const AcousticMatchSchema = z.object({
+  diarization_speaker: z.string(),
+  matched_name: z.string(),
+  cosine_similarity: z.number(),
+  confirmed: z.boolean(),
+})
+
+export const AcousticMatchesCompleteSchema = z.object({
+  matches: z.array(AcousticMatchSchema),
+})
+
+export const SegmentsResolvedSchema = z.object({
+  segments: z.array(SegmentSchema),
+})
+
 export const AnalysisCompleteSchema = z.object({
   decisions: z.array(DecisionSchema),
   ambiguities: z.array(AmbiguitySchema),
@@ -97,6 +112,7 @@ export type MeetingDynamics = z.infer<typeof MeetingDynamicsSchema>
 export type ToolCallEntry = z.infer<typeof ToolCallSchema>
 export type ToolResultEntry = z.infer<typeof ToolResultSchema>
 export type SpeakerResolutionEntry = z.infer<typeof SpeakerResolvedSchema>
+export type AcousticMatchEntry = z.infer<typeof AcousticMatchSchema>
 export type AnalysisResult = z.infer<typeof AnalysisCompleteSchema>
 
 // ─── Auth helpers ───────────────────────────────────────────────────────────
@@ -118,10 +134,13 @@ export function authHeaders(): Record<string, string> {
 
 // ─── API client ──────────────────────────────────────────────────────────────
 
-export async function submitJob(file: File): Promise<string> {
+export async function submitJob(file: File, attendees?: string[]): Promise<string> {
   const base = await getBackend()
   const form = new FormData()
   form.append('audio', file)
+  if (attendees && attendees.length > 0) {
+    form.append('attendees', JSON.stringify(attendees))
+  }
   const res = await fetch(`${base}/jobs`, {
     method: 'POST',
     body: form,
@@ -129,7 +148,7 @@ export async function submitJob(file: File): Promise<string> {
   })
   if (res.status === 401) {
     promptApiKey()
-    return submitJob(file) // retry with new key
+    return submitJob(file, attendees) // retry with new key
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
   const data = JobCreatedSchema.parse(await res.json())

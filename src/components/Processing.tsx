@@ -5,7 +5,7 @@ import GlassCard from './ui/GlassCard'
 import Icon from './ui/Icon'
 
 const PHASES = [
-  { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech → Text', icon: 'mic' },
+  { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech -> Text', icon: 'mic' },
   { id: 'diarizing', label: 'PYANNOTE + ERES2NET', sub: 'Speaker Separation', icon: 'group' },
   { id: 'resolving', label: 'MISTRAL AGENT', sub: 'Speaker Resolution', icon: 'smart_toy' },
   { id: 'analyzing', label: 'MISTRAL LARGE 3', sub: 'Decision Intelligence', icon: 'psychology' },
@@ -21,7 +21,14 @@ function normalizePhase(phase: string | null): PhaseId | null {
 }
 
 export default function Processing() {
-  const { jobId, phase, transcript, toolCalls, speakerResolutions } = useStore()
+  const {
+    jobId,
+    phase,
+    transcript,
+    toolCalls,
+    speakerResolutions,
+    acousticMatches,
+  } = useStore()
 
   useSSE(jobId)
 
@@ -32,7 +39,6 @@ export default function Processing() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full">
-      {/* Phase indicators */}
       <div className="grid grid-cols-4 gap-3">
         {PHASES.map((p, i) => {
           const status =
@@ -63,7 +69,6 @@ export default function Processing() {
                 )}
               </AnimatePresence>
 
-              {/* Progress segments */}
               <div className="flex gap-0.5 mb-3 relative z-10">
                 {Array.from({ length: 10 }).map((_, j) => (
                   <motion.div
@@ -101,9 +106,7 @@ export default function Processing() {
         })}
       </div>
 
-      {/* Live transcript */}
       <GlassCard className="flex-1 flex flex-col overflow-hidden">
-        {/* Terminal chrome */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-glass-border bg-white/[0.02]">
           <span className="w-2.5 h-2.5 rounded-full bg-neon-magenta/70" />
           <span className="w-2.5 h-2.5 rounded-full bg-neon-yellow/70" />
@@ -118,7 +121,6 @@ export default function Processing() {
         </div>
       </GlassCard>
 
-      {/* Agent activity panel */}
       {phase === 'resolving' && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -165,8 +167,28 @@ export default function Processing() {
         </motion.div>
       )}
 
+      {acousticMatches.length > 0 && (
+        <GlassCard className="p-5" borderAccent="cyan" data-testid="acoustic-matches-panel">
+          <p className="font-hud text-xs font-semibold tracking-[0.12em] text-neon-cyan uppercase mb-3">
+            Acoustic Match Candidates
+          </p>
+          <div className="space-y-2">
+            {acousticMatches.map((m, i) => (
+              <div key={`${m.diarization_speaker}-${m.matched_name}-${i}`} className="flex justify-between gap-3 text-xs font-code">
+                <span className="text-zinc-300 truncate">
+                  {m.diarization_speaker} -&gt; {m.matched_name}
+                </span>
+                <span className={m.confirmed ? 'text-green-400' : 'text-neon-yellow'}>
+                  {(m.cosine_similarity * 100).toFixed(0)}% {m.confirmed ? 'confirmed' : 'tentative'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
       <p className="text-xs text-zinc-600 text-center font-code">
-        Pipeline running — this may take a few minutes for long recordings.
+        Pipeline running - this may take a few minutes for long recordings.
       </p>
     </div>
   )
