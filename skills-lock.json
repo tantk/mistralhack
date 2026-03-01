@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "frontend-slides": {
+      "source": "zarazhangrui/frontend-slides",
+      "sourceType": "github",
+      "computedHash": "ebb8e9cecf7d63ddc537d90d3e35ec9ce416b6b2111202a9ad1c2fecd513e64d"
+    },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
       "sourceType": "github",

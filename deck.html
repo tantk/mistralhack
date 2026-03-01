@@ -12,8 +12,7 @@
 
     <style>
         /* ===========================================
-           THEME — Matches MeetingMind's frontend palette
-           Cyan/magenta/dark navy cyberpunk
+           THEME — Cyan/magenta/dark navy cyberpunk
            =========================================== */
         :root {
             --bg-deep: #050e10;
@@ -76,7 +75,7 @@
         }
 
         /* ===========================================
-           PROGRESS BAR — top of viewport
+           PROGRESS BAR
            =========================================== */
         .progress-bar {
             position: fixed;
@@ -90,7 +89,7 @@
         }
 
         /* ===========================================
-           NAV DOTS — right side
+           NAV DOTS
            =========================================== */
         .nav-dots {
             position: fixed;
@@ -99,42 +98,27 @@
             transform: translateY(-50%);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             z-index: 90;
         }
+
         .nav-dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            border: 1.5px solid var(--text-dim);
-            background: transparent;
+            background: rgba(255,255,255,0.15);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s var(--ease);
         }
+
         .nav-dot.active {
             background: var(--cyan);
-            border-color: var(--cyan);
             box-shadow: 0 0 8px var(--cyan-glow);
             transform: scale(1.3);
         }
 
-        /* ===========================================
-           KEYBOARD HINT
-           =========================================== */
-        .kbd-hint {
-            position: fixed;
-            bottom: 1.2rem; right: 1.5rem;
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            z-index: 90;
-            opacity: 0.6;
-        }
-        .kbd-hint kbd {
-            background: var(--bg-card);
-            border: 1px solid var(--text-dim);
-            border-radius: 3px;
-            padding: 1px 5px;
-            font-size: 0.65rem;
+        .nav-dot:hover:not(.active) {
+            background: rgba(255,255,255,0.35);
         }
 
         /* ===========================================
@@ -142,85 +126,83 @@
            =========================================== */
         .slide-counter {
             position: fixed;
-            bottom: 1.2rem; left: 1.5rem;
+            bottom: 1.2rem;
+            right: 1.5rem;
             font-family: var(--font-mono);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--text-dim);
             z-index: 90;
         }
-        .slide-counter .current {
-            color: var(--cyan);
-            font-weight: 600;
+
+        /* ===========================================
+           KEYBOARD HINT
+           =========================================== */
+        .kb-hint {
+            position: fixed;
+            bottom: 1.2rem;
+            left: 1.5rem;
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            z-index: 90;
+            opacity: 0.6;
         }
 
         /* ===========================================
-           ANIMATION — reveal on scroll
+           REVEAL ANIMATIONS
            =========================================== */
         .reveal {
             opacity: 0;
-            transform: translateY(28px);
+            transform: translateY(25px);
             transition: opacity var(--dur) var(--ease),
                         transform var(--dur) var(--ease);
         }
-        .reveal-left {
-            opacity: 0;
-            transform: translateX(-40px);
-            transition: opacity var(--dur) var(--ease),
-                        transform var(--dur) var(--ease);
-        }
-        .reveal-right {
-            opacity: 0;
-            transform: translateX(40px);
-            transition: opacity var(--dur) var(--ease),
-                        transform var(--dur) var(--ease);
-        }
-        .reveal-scale {
-            opacity: 0;
-            transform: scale(0.92);
-            transition: opacity var(--dur) var(--ease),
-                        transform var(--dur) var(--ease);
-        }
-        .slide.visible .reveal,
-        .slide.visible .reveal-left,
-        .slide.visible .reveal-right,
-        .slide.visible .reveal-scale {
+
+        .slide.visible .reveal {
             opacity: 1;
-            transform: none;
+            transform: translateY(0);
         }
-        .slide.visible .reveal:nth-child(1), .slide.visible .reveal-left:nth-child(1) { transition-delay: 0.05s; }
-        .slide.visible .reveal:nth-child(2), .slide.visible .reveal-left:nth-child(2) { transition-delay: 0.12s; }
-        .slide.visible .reveal:nth-child(3), .slide.visible .reveal-right:nth-child(3) { transition-delay: 0.19s; }
-        .slide.visible .reveal:nth-child(4), .slide.visible .reveal-right:nth-child(4) { transition-delay: 0.26s; }
-        .slide.visible .reveal:nth-child(5) { transition-delay: 0.33s; }
-        .slide.visible .reveal:nth-child(6) { transition-delay: 0.40s; }
-        .slide.visible .reveal:nth-child(7) { transition-delay: 0.47s; }
-        .slide.visible .reveal:nth-child(8) { transition-delay: 0.54s; }
+
+        .reveal:nth-child(2) { transition-delay: 0.08s; }
+        .reveal:nth-child(3) { transition-delay: 0.16s; }
+        .reveal:nth-child(4) { transition-delay: 0.24s; }
+        .reveal:nth-child(5) { transition-delay: 0.32s; }
+        .reveal:nth-child(6) { transition-delay: 0.40s; }
+        .reveal:nth-child(7) { transition-delay: 0.48s; }
 
         /* ===========================================
            TYPOGRAPHY
            =========================================== */
-        h1 {
+        h1, h2, h3 {
             font-family: var(--font-display);
             font-weight: 700;
-            letter-spacing: -0.02em;
-        }
-        h2 {
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: clamp(1.6rem, 3.5vw, 2.4rem);
-            letter-spacing: -0.01em;
-        }
-        h3 {
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 1.1rem;
+            line-height: 1.15;
         }
 
-        .label {
+        h2 { font-size: clamp(1.4rem, 3.5vw, 2.2rem); }
+        h3 { font-size: 1rem; font-weight: 600; }
+
+        .title-mega {
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            background: linear-gradient(135deg, var(--cyan) 0%, #06f1f9 30%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+
+        .title-sub {
+            font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+            color: var(--text-muted);
+            max-width: 640px;
+            margin-inline: auto;
+            text-align: center;
+        }
+
+        .section-label {
             font-family: var(--font-mono);
             font-size: 0.72rem;
-            letter-spacing: 0.12em;
             text-transform: uppercase;
+            letter-spacing: 2px;
             color: var(--cyan);
         }
 
@@ -232,220 +214,79 @@
         .orange { color: var(--orange); }
         .muted { color: var(--text-muted); }
         .dim { color: var(--text-dim); }
+        .label { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--cyan); }
 
         /* ===========================================
-           GLASS CARD
+           LAYOUT UTILITIES
+           =========================================== */
+        .max-w { max-width: 900px; }
+        .max-w-lg { max-width: 1100px; }
+        .flex-center { display: flex; align-items: center; justify-content: center; text-align: center; }
+        .flex-col { display: flex; flex-direction: column; }
+        .flow-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+        .gap-sm { gap: 0.5rem; }
+        .gap-md { gap: 1rem; }
+        .mt-sm { margin-top: 0.5rem; }
+        .mt-md { margin-top: 1rem; }
+        .mt-lg { margin-top: 1.5rem; }
+        .mb-sm { margin-bottom: 0.5rem; }
+        .mb-md { margin-bottom: 1rem; }
+
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
+        .grid-5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1rem; }
+
+        /* ===========================================
+           GLASS CARDS
            =========================================== */
         .glass {
-            background: var(--bg-card);
-            border: 1px solid rgba(6, 241, 249, 0.08);
-            border-radius: 12px;
-            padding: 1.4rem;
-            position: relative;
-        }
-        .glass::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 12px;
-            padding: 1px;
-            background: linear-gradient(135deg, rgba(6,241,249,0.12), transparent 60%);
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
+            background: rgba(15, 34, 35, 0.7);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 1.2rem 1.4rem;
+            backdrop-filter: blur(10px);
         }
 
-        .glass-cyan { border-left: 3px solid var(--cyan); }
-        .glass-magenta { border-left: 3px solid var(--magenta); }
-        .glass-yellow { border-left: 3px solid var(--yellow); }
-        .glass-green { border-left: 3px solid var(--green); }
-        .glass-purple { border-left: 3px solid var(--purple); }
-        .glass-orange { border-left: 3px solid var(--orange); }
+        .glass-cyan { border-left: 3px solid rgba(6, 241, 249, 0.4); }
+        .glass-magenta { border-left: 3px solid rgba(255, 0, 60, 0.4); }
+        .glass-yellow { border-left: 3px solid rgba(255, 214, 0, 0.4); }
+        .glass-green { border-left: 3px solid rgba(72, 187, 120, 0.4); }
+        .glass-purple { border-left: 3px solid rgba(159, 122, 234, 0.4); }
+        .glass-orange { border-left: 3px solid rgba(237, 137, 54, 0.4); }
 
         /* ===========================================
-           LAYOUT HELPERS
+           STAT BOXES
            =========================================== */
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
-        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.8rem; }
-        .flex-center { display: flex; align-items: center; justify-content: center; }
-        .flex-col { display: flex; flex-direction: column; }
-        .gap-sm { gap: 0.6rem; }
-        .gap-md { gap: 1rem; }
-        .gap-lg { gap: 1.6rem; }
-        .mt-sm { margin-top: 0.6rem; }
-        .mt-md { margin-top: 1.2rem; }
-        .mt-lg { margin-top: 2rem; }
-        .mb-sm { margin-bottom: 0.6rem; }
-        .max-w { max-width: 900px; }
-
-        /* ===========================================
-           PIPELINE FLOW — horizontal phase arrows
-           =========================================== */
-        .pipeline {
-            display: flex;
-            align-items: stretch;
-            gap: 0;
-            width: 100%;
-        }
-        .phase-box {
-            flex: 1;
-            padding: 1rem 0.8rem;
-            text-align: center;
-            position: relative;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.3rem;
-        }
-        .phase-box .phase-num {
-            font-family: var(--font-mono);
-            font-size: 0.65rem;
-            color: var(--text-dim);
-            letter-spacing: 0.1em;
-        }
-        .phase-box .phase-name {
+        .stat { text-align: center; }
+        .stat-value {
             font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-        .phase-box .phase-detail {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-        }
-        .phase-arrow {
-            display: flex;
-            align-items: center;
-            padding: 0 0.3rem;
-            color: var(--text-dim);
-            font-size: 1.2rem;
-        }
-
-        /* ===========================================
-           CODE BLOCK
-           =========================================== */
-        .code-block {
-            background: var(--bg-deep);
-            border: 1px solid rgba(6,241,249,0.08);
-            border-radius: 8px;
-            padding: 1rem 1.2rem;
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            line-height: 1.7;
-            overflow-x: auto;
-            color: var(--text-muted);
-        }
-        .code-block .kw { color: var(--cyan); }
-        .code-block .fn { color: var(--yellow); }
-        .code-block .str { color: var(--green); }
-        .code-block .comment { color: var(--text-dim); font-style: italic; }
-        .code-block .type { color: var(--purple); }
-
-        /* ===========================================
-           TOOL BADGE — for agent tools
-           =========================================== */
-        .tool-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            background: var(--bg-elevated);
-            border: 1px solid rgba(6,241,249,0.12);
-            border-radius: 6px;
-            padding: 0.35rem 0.7rem;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            color: var(--cyan);
-        }
-        .tool-badge .tool-icon {
-            width: 14px; height: 14px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-
-        /* ===========================================
-           STAT BLOCK
-           =========================================== */
-        .stat {
-            text-align: center;
-        }
-        .stat .stat-value {
-            font-family: var(--font-display);
+            font-size: 2.2rem;
             font-weight: 700;
-            font-size: clamp(2rem, 4vw, 3rem);
             color: var(--cyan);
-            line-height: 1.1;
         }
-        .stat .stat-label {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin-top: 0.3rem;
-        }
-
-        /* ===========================================
-           ANIMATED GRADIENT MESH — for title bg
-           =========================================== */
-        .gradient-mesh {
-            position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(ellipse at 15% 85%, rgba(6,241,249,0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 85% 15%, rgba(255,0,60,0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(159,122,234,0.04) 0%, transparent 60%);
-            pointer-events: none;
-        }
-
-        /* Grid pattern overlay */
-        .grid-pattern {
-            position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(6,241,249,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6,241,249,0.02) 1px, transparent 1px);
-            background-size: 60px 60px;
-            pointer-events: none;
+        .stat-label {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            margin-top: 0.2rem;
         }
 
         /* ===========================================
-           MISTRAL BADGE
+           FLOW ARROWS
            =========================================== */
-        .mistral-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: linear-gradient(135deg, rgba(255,122,0,0.15), rgba(255,60,0,0.08));
-            border: 1px solid rgba(255,122,0,0.25);
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
+        .flow-node {
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            color: var(--orange);
+            font-size: 0.72rem;
+            padding: 0.35rem 0.7rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            color: var(--text-muted);
+            white-space: nowrap;
         }
 
-        /* ===========================================
-           FLOW CONNECTOR
-           =========================================== */
-        .flow-row {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
         .flow-arrow {
             color: var(--text-dim);
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-        .flow-node {
-            background: var(--bg-elevated);
-            border: 1px solid rgba(6,241,249,0.1);
-            border-radius: 6px;
-            padding: 0.4rem 0.8rem;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            white-space: nowrap;
+            font-size: 0.85rem;
         }
 
         /* ===========================================
@@ -453,46 +294,112 @@
            =========================================== */
         .divider {
             width: 60px;
-            height: 3px;
+            height: 2px;
             background: var(--cyan);
-            border-radius: 2px;
             box-shadow: 0 0 10px var(--cyan-glow);
         }
 
+        .hr-subtle {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            margin: 0.8rem 0;
+        }
+
         /* ===========================================
-           LIST STYLES
+           CLEAN LIST
            =========================================== */
         ul.clean {
             list-style: none;
-            padding: 0;
         }
+
         ul.clean li {
             position: relative;
-            padding-left: 1.2rem;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
+            padding-left: 1rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
+            margin-bottom: 0.35rem;
         }
+
         ul.clean li::before {
             content: '';
             position: absolute;
             left: 0;
             top: 0.55em;
-            width: 6px; height: 6px;
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
             background: var(--cyan);
+            opacity: 0.5;
         }
 
         /* ===========================================
-           CONFIDENCE BAR
+           BADGES
+           =========================================== */
+        .mistral-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 500;
+            padding: 0.3rem 0.75rem;
+            border: 1px solid rgba(237,137,54,0.3);
+            border-radius: 20px;
+            color: var(--orange);
+            background: linear-gradient(135deg, rgba(237,137,54,0.1), rgba(237,137,54,0.03));
+        }
+
+        /* ===========================================
+           TOOL BADGES
+           =========================================== */
+        .tool-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 0.35rem 0.8rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+        }
+
+        .tool-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ===========================================
+           CODE BLOCKS
+           =========================================== */
+        .code-block {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.7;
+            padding: 1rem;
+            background: var(--bg-deep);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .code-block .kw { color: var(--cyan); }
+        .code-block .fn { color: var(--green); }
+        .code-block .str { color: var(--orange); }
+        .code-block .type { color: var(--purple); }
+        .code-block .comment { color: var(--text-dim); }
+
+        /* ===========================================
+           CONFIDENCE BARS
            =========================================== */
         .conf-bar {
             height: 4px;
+            background: rgba(255,255,255,0.06);
             border-radius: 2px;
-            background: var(--bg-deep);
-            overflow: hidden;
-            margin-top: 0.3rem;
+            margin-top: 4px;
         }
+
         .conf-fill {
             height: 100%;
             border-radius: 2px;
@@ -500,117 +407,188 @@
         }
 
         /* ===========================================
-           RESPONSIVE
+           PIPELINE BOXES
            =========================================== */
-        @media (max-width: 900px) {
-            .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
-            .pipeline { flex-direction: column; gap: 0.5rem; }
-            .phase-arrow { transform: rotate(90deg); justify-content: center; }
-            .nav-dots, .kbd-hint { display: none; }
+        .pipeline {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            .reveal, .reveal-left, .reveal-right, .reveal-scale {
-                transition: opacity 0.3s ease;
-                transform: none;
-            }
+        .phase-box {
+            flex: 1;
+            min-width: 140px;
+            max-width: 200px;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .phase-num {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 1.5px;
+            color: var(--text-dim);
+        }
+
+        .phase-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .phase-detail {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .phase-arrow {
+            display: flex;
+            align-items: center;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            padding: 0 0.3rem;
         }
 
         /* ===========================================
-           SLIDE-SPECIFIC LAYOUTS
+           AGENT LOOP LAYOUT
            =========================================== */
-        .title-slide {
-            align-items: center;
-            text-align: center;
+        .agent-loop {
+            display: grid;
+            grid-template-columns: 1fr 1.1fr;
+            gap: 1.5rem;
         }
 
-        .title-mega {
-            font-size: clamp(3rem, 8vw, 6rem);
-            line-height: 1;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, var(--cyan), #a0f0ff, var(--cyan));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        @media (max-width: 768px) {
+            .agent-loop { grid-template-columns: 1fr; }
         }
 
-        .title-sub {
-            font-size: clamp(1rem, 2.5vw, 1.4rem);
-            color: var(--text-muted);
-            font-weight: 300;
-            max-width: 700px;
-            margin-top: 0.8rem;
-        }
-
-        .section-label {
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--cyan);
-            margin-bottom: 0.6rem;
-        }
-
-        /* Fallback cascade visual */
+        /* ===========================================
+           FALLBACK CHAIN
+           =========================================== */
         .fallback-chain {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
+
         .fallback-level {
             display: flex;
             align-items: center;
             gap: 0.6rem;
-            padding: 0.5rem 0.8rem;
+            padding: 0.5rem 0.7rem;
             border-radius: 6px;
-            font-size: 0.82rem;
         }
-        .fallback-level .level-tag {
+
+        .level-tag {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 1px;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+
+        /* ===========================================
+           DEMO BORDER
+           =========================================== */
+        .demo-border {
+            border: 2px solid rgba(6, 241, 249, 0.2);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: radial-gradient(ellipse at center, rgba(6,241,249,0.04) 0%, transparent 70%);
+        }
+
+        /* ===========================================
+           GRADIENT MESH BACKGROUND
+           =========================================== */
+        .gradient-mesh {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background:
+                radial-gradient(ellipse at 20% 80%, rgba(6,241,249,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(159,122,234,0.05) 0%, transparent 50%);
+        }
+
+        /* ===========================================
+           GRID PATTERN BACKGROUND
+           =========================================== */
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* ===========================================
+           TITLE SLIDE CENTER ALIGNMENT
+           =========================================== */
+        .title-slide {
+            text-align: center;
+            align-items: center;
+        }
+
+        /* ===========================================
+           FUTURE VISION CARDS
+           =========================================== */
+        .future-card {
+            background: rgba(15, 34, 35, 0.5);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+        }
+
+        .future-card h3 {
+            font-size: 0.92rem;
+        }
+
+        .future-num {
             font-family: var(--font-mono);
             font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            flex-shrink: 0;
+            color: var(--text-dim);
+            letter-spacing: 1px;
         }
 
-        /* Demo slide pulsing border */
-        .demo-border {
-            border: 2px solid var(--cyan);
-            border-radius: 16px;
-            padding: 3rem;
-            text-align: center;
-            position: relative;
-            animation: pulse-border 2s ease-in-out infinite;
-        }
-        @keyframes pulse-border {
-            0%, 100% { box-shadow: 0 0 20px rgba(6,241,249,0.1); }
-            50% { box-shadow: 0 0 40px rgba(6,241,249,0.25); }
+        /* ===========================================
+           ZVEC HIGHLIGHT
+           =========================================== */
+        .zvec-highlight {
+            border: 1px solid rgba(6,241,249,0.2);
+            background: radial-gradient(ellipse at 50% 50%, rgba(6,241,249,0.04) 0%, transparent 70%);
         }
 
-        /* Agent loop diagram */
-        .agent-loop {
-            display: flex;
-            align-items: flex-start;
-            gap: 1.5rem;
+        /* ===========================================
+           RESPONSIVE
+           =========================================== */
+        @media (max-width: 768px) {
+            .nav-dots, .kb-hint { display: none; }
+            .pipeline { flex-direction: column; align-items: center; }
+            .phase-arrow { transform: rotate(90deg); }
         }
-        .agent-loop-left { flex: 1; }
-        .agent-loop-right { flex: 1; }
 
-        /* Horizontal rule */
-        .hr-subtle {
-            border: none;
-            border-top: 1px solid rgba(6,241,249,0.06);
-            margin: 1rem 0;
+        @media (prefers-reduced-motion: reduce) {
+            .reveal { transition: opacity 0.3s ease; transform: none; }
+            html { scroll-behavior: auto; }
         }
     </style>
 </head>
 <body>
-
-    <!-- Fixed UI elements -->
     <div class="progress-bar" id="progressBar"></div>
-    <nav class="nav-dots" id="navDots"></nav>
-    <div class="slide-counter"><span class="current" id="slideNum">1</span> / <span id="slideTotal">14</span></div>
-    <div class="kbd-hint"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>Space</kbd></div>
+
+    <nav class="nav-dots" id="navDots" aria-label="Slide navigation"></nav>
+
+    <div class="slide-counter"><span id="slideNum">1</span> / <span id="slideTotal">14</span></div>
+    <div class="kb-hint">arrows / space to navigate</div>
 
     <!-- =============================================
          SLIDE 1 — TITLE
@@ -656,8 +634,8 @@
                     <p class="muted" style="font-size:0.85rem;">Action items vanish. Decisions are contested. There's no canonical record.</p>
                 </div>
                 <div class="glass glass-cyan">
-                    <h3 class="accent mb-sm">Manual Effort</h3>
-                    <p class="muted" style="font-size:0.85rem;">Existing tools transcribe, but don't attribute speakers or extract structure.</p>
+                    <h3 class="accent mb-sm">Speaker Blindness</h3>
+                    <p class="muted" style="font-size:0.85rem;">Existing tools transcribe, but they don't know <em>who</em> is speaking — let alone remember them across meetings.</p>
                 </div>
             </div>
         </div>
@@ -676,7 +654,7 @@
                 <div class="flex-col gap-md">
                     <div class="glass glass-cyan">
                         <h3>Speaker-Attributed Transcript</h3>
-                        <p class="muted mt-sm" style="font-size:0.85rem;">Acoustic + semantic hybrid resolution identifies who said what — even across meetings via voiceprint memory.</p>
+                        <p class="muted mt-sm" style="font-size:0.85rem;">Acoustic + semantic hybrid resolution identifies who said what — and remembers voices across meetings via voiceprint memory.</p>
                     </div>
                     <div class="glass glass-green">
                         <h3>Structured Outputs</h3>
@@ -707,20 +685,18 @@
         <div class="reveal divider mt-md"></div>
 
         <div class="reveal mt-lg" style="display:flex; gap:1.5rem; align-items:stretch; flex-wrap:wrap;">
-            <!-- Frontend -->
             <div class="glass glass-green" style="flex:1; min-width:200px;">
                 <p class="label green" style="color:var(--green);">Frontend</p>
                 <h3 class="mt-sm">React + TypeScript</h3>
                 <ul class="clean mt-sm">
                     <li>Drag-and-drop upload</li>
                     <li>SSE + polling fallback</li>
-                    <li>Interactive timeline</li>
+                    <li>Interactive speaker timeline</li>
                     <li>Ambiguity resolver</li>
                 </ul>
-                <p class="dim mt-sm" style="font-size:0.72rem;">Zustand / Framer Motion / WaveSurfer</p>
+                <p class="dim mt-sm" style="font-size:0.72rem;">Zustand / Framer Motion / Zod</p>
             </div>
 
-            <!-- Orchestrator -->
             <div class="glass glass-orange" style="flex:1.3; min-width:220px;">
                 <p class="label orange" style="color:var(--orange);">Orchestrator</p>
                 <h3 class="mt-sm">Rust + Axum</h3>
@@ -733,7 +709,6 @@
                 <p class="dim mt-sm" style="font-size:0.72rem;">Tokio broadcast channels / SSE adapter</p>
             </div>
 
-            <!-- AI Services -->
             <div class="glass glass-purple" style="flex:1.2; min-width:220px;">
                 <p class="label purple" style="color:var(--purple);">AI Services</p>
                 <h3 class="mt-sm">Mistral + GPU + zvec</h3>
@@ -741,7 +716,7 @@
                     <li>Voxtral transcription (word timestamps)</li>
                     <li>Mistral Large agent reasoning</li>
                     <li>Pyannote diarization (GPU)</li>
-                    <li>Voiceprint memory (vector store)</li>
+                    <li>In-memory voiceprint store</li>
                 </ul>
                 <p class="dim mt-sm" style="font-size:0.72rem;">FunASR embeddings / cosine similarity</p>
             </div>
@@ -762,7 +737,7 @@
                 <span class="phase-num">PHASE 1</span>
                 <span class="phase-name orange">Transcribe</span>
                 <span class="phase-detail">Voxtral word-level timestamps</span>
-                <span class="phase-detail dim">Chunked for &gt;30min audio</span>
+                <span class="phase-detail dim">Chunked for long audio</span>
             </div>
             <div class="phase-arrow">&rarr;</div>
             <div class="phase-box" style="background:rgba(237,137,54,0.12); border:1px solid rgba(237,137,54,0.2);">
@@ -811,7 +786,7 @@
     </section>
 
     <!-- =============================================
-         SLIDE 6 — AGENTIC CORE (the big differentiator)
+         SLIDE 6 — AGENTIC CORE
          ============================================= -->
     <section class="slide" data-title="Agent">
         <div class="gradient-mesh"></div>
@@ -939,120 +914,38 @@
     </section>
 
     <!-- =============================================
-         SLIDE 8 — TEMPORAL ALIGNMENT + ACOUSTIC MATCHING
+         SLIDE 8 — ZVEC: IN-MEMORY SPEAKER MEMORY
          ============================================= -->
-    <section class="slide" data-title="Engineering">
+    <section class="slide" data-title="zvec">
         <div class="gradient-mesh"></div>
-        <p class="reveal section-label">Engineering Depth</p>
-        <h2 class="reveal">Precision Alignment & Acoustic Matching</h2>
+        <p class="reveal section-label">Speaker Memory</p>
+        <h2 class="reveal">zvec: In-Memory Vector Store for Voiceprints</h2>
         <div class="reveal divider mt-md"></div>
 
         <div class="reveal grid-2 mt-lg">
             <div class="flex-col gap-md">
-                <div class="glass glass-cyan">
-                    <h3>Temporal Drift Correction</h3>
-                    <p class="muted mt-sm" style="font-size:0.85rem;">
-                        Transcription and diarization pipelines produce timestamps with systematic offset. The orchestrator tests <span class="accent">-150ms to +150ms</span> in 10ms steps, maximizes word-segment overlap, and applies correction if drift exceeds 20ms.
-                    </p>
+                <p class="muted" style="font-size:0.9rem;">Most meeting tools treat every call as a blank slate. MeetingMind remembers voices. Enroll a speaker once, and the system matches them acoustically in every future upload.</p>
+
+                <div class="glass zvec-highlight">
+                    <h3 class="accent mb-sm">Why zvec?</h3>
+                    <ul class="clean">
+                        <li>Embedded in-process — no external database to provision or manage</li>
+                        <li>Native FP32 cosine similarity over 192-dim vectors</li>
+                        <li>Sub-millisecond top-k lookup for voiceprint matching</li>
+                        <li>Persistent storage with zero-config initialization</li>
+                        <li>Hackathon-deployable: one container, no infra overhead</li>
+                    </ul>
                 </div>
+
                 <div class="glass glass-purple">
-                    <h3>Smart Segment Selection</h3>
+                    <h3 style="color:var(--purple);">Novel Speaker Identification</h3>
                     <p class="muted mt-sm" style="font-size:0.85rem;">
-                        For voiceprint extraction, selects the optimal ~5s non-overlapping segment per speaker. Falls back to concatenation of adjacent segments within 0.5s gap. Ensures clean embeddings without speaker interference.
+                        zvec enables a pipeline that most meeting tools can't offer: extract a speaker embedding from a ~5s audio segment, query the store for cosine-similar enrolled voices, and feed ranked candidates as <em>evidence</em> into the Mistral agent. The agent fuses acoustic similarity with semantic cues to make the final attribution.
                     </p>
                 </div>
             </div>
+
             <div class="flex-col gap-md">
-                <div class="glass glass-orange">
-                    <h3>Acoustic-Semantic Fusion</h3>
-                    <p class="muted mt-sm" style="font-size:0.85rem;">
-                        Pre-computed voiceprint matches are injected as evidence into the agent's context. The agent fuses these with transcript-level cues: self-introductions, name mentions, role references, and attendee list proximity.
-                    </p>
-                </div>
-                <div class="glass glass-green">
-                    <h3>Orphan Recovery</h3>
-                    <p class="muted mt-sm" style="font-size:0.85rem;">
-                        Words that fall between diarization segments are recovered within a <span class="accent">&plusmn;300ms</span> window and assigned to the nearest speaker. Overlap regions are detected and flagged for the agent.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- =============================================
-         SLIDE 9 — GRACEFUL DEGRADATION
-         ============================================= -->
-    <section class="slide" data-title="Resilience">
-        <div class="grid-pattern"></div>
-        <p class="reveal section-label">Resilience</p>
-        <h2 class="reveal">Multi-Level Fallback Cascade</h2>
-        <div class="reveal divider mt-md"></div>
-
-        <p class="reveal muted mt-md max-w" style="font-size:0.9rem;">Every phase is designed to degrade gracefully. If the GPU service is unavailable, Mistral API picks up. If the agent fails to resolve speakers, threshold-based acoustic matching takes over. The pipeline never hard-fails.</p>
-
-        <div class="reveal grid-2 mt-lg">
-            <div class="glass">
-                <p class="label mb-sm">Transcription</p>
-                <div class="fallback-chain">
-                    <div class="fallback-level" style="background:rgba(72,187,120,0.08);">
-                        <span class="level-tag" style="background:rgba(72,187,120,0.15); color:var(--green);">PRIMARY</span>
-                        <span class="muted" style="font-size:0.82rem;">GPU Voxtral (self-hosted)</span>
-                    </div>
-                    <div class="fallback-level" style="background:rgba(255,214,0,0.06);">
-                        <span class="level-tag" style="background:rgba(255,214,0,0.12); color:var(--yellow);">FALLBACK</span>
-                        <span class="muted" style="font-size:0.82rem;">Mistral Audio API</span>
-                    </div>
-                    <div class="fallback-level" style="background:rgba(255,0,60,0.05);">
-                        <span class="level-tag" style="background:rgba(255,0,60,0.1); color:var(--magenta);">LAST RESORT</span>
-                        <span class="muted" style="font-size:0.82rem;">CPU Voxtral (&lt;60s audio)</span>
-                    </div>
-                </div>
-            </div>
-            <div class="glass">
-                <p class="label mb-sm">Speaker Resolution</p>
-                <div class="fallback-chain">
-                    <div class="fallback-level" style="background:rgba(72,187,120,0.08);">
-                        <span class="level-tag" style="background:rgba(72,187,120,0.15); color:var(--green);">PRIMARY</span>
-                        <span class="muted" style="font-size:0.82rem;">Mistral agent + tool loop</span>
-                    </div>
-                    <div class="fallback-level" style="background:rgba(255,214,0,0.06);">
-                        <span class="level-tag" style="background:rgba(255,214,0,0.12); color:var(--yellow);">FALLBACK</span>
-                        <span class="muted" style="font-size:0.82rem;">Threshold fallback (&ge;0.85 cosine)</span>
-                    </div>
-                    <div class="fallback-level" style="background:rgba(255,0,60,0.05);">
-                        <span class="level-tag" style="background:rgba(255,0,60,0.1); color:var(--magenta);">DEGRADED</span>
-                        <span class="muted" style="font-size:0.82rem;">Unresolved with candidates flagged</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="reveal glass mt-md" style="padding:0.8rem 1.2rem;">
-            <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
-                <div>
-                    <p class="dim" style="font-size:0.72rem;">GPU Health Monitor</p>
-                    <p class="muted" style="font-size:0.82rem;">Background check every 60s. Non-blocking cache returns stale result immediately, spawns refresh.</p>
-                </div>
-                <div>
-                    <p class="dim" style="font-size:0.72rem;">Resolution Tracking</p>
-                    <p class="muted" style="font-size:0.82rem;">Every resolved speaker carries its method: <code style="font-family:var(--font-mono); font-size:0.72rem; color:var(--cyan);">agent | acoustic | threshold_fallback</code></p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- =============================================
-         SLIDE 10 — VOICEPRINT MEMORY
-         ============================================= -->
-    <section class="slide" data-title="Memory">
-        <div class="gradient-mesh"></div>
-        <p class="reveal section-label">Persistent Memory</p>
-        <h2 class="reveal">Cross-Meeting Speaker Re-Identification</h2>
-        <div class="reveal divider mt-md"></div>
-
-        <div class="reveal grid-2 mt-lg">
-            <div class="flex-col gap-md">
-                <p class="muted" style="font-size:0.9rem;">MeetingMind remembers voices across meetings. Enroll a speaker once, and the system recognizes them in every future upload through acoustic embedding similarity.</p>
                 <div class="glass glass-cyan">
                     <p class="label mb-sm">Enrollment Flow</p>
                     <div class="flow-row">
@@ -1065,8 +958,8 @@
                         <span class="flow-node" style="border-color:rgba(6,241,249,0.3);">zvec store</span>
                     </div>
                 </div>
-                <div class="glass glass-purple">
-                    <p class="label mb-sm" style="color:var(--purple);">Identification Flow</p>
+                <div class="glass glass-orange">
+                    <p class="label mb-sm" style="color:var(--orange);">Identification Flow</p>
                     <div class="flow-row">
                         <span class="flow-node">Segment</span>
                         <span class="flow-arrow">&rarr;</span>
@@ -1074,32 +967,38 @@
                         <span class="flow-arrow">&rarr;</span>
                         <span class="flow-node">Top-3 cosine</span>
                         <span class="flow-arrow">&rarr;</span>
-                        <span class="flow-node" style="border-color:rgba(159,122,234,0.3);">Agent evidence</span>
+                        <span class="flow-node" style="border-color:rgba(237,137,54,0.3);">Agent evidence</span>
                     </div>
                 </div>
-            </div>
-            <div class="glass" style="display:flex; flex-direction:column; justify-content:center;">
-                <div class="stat">
-                    <div class="stat-value">192</div>
-                    <div class="stat-label">Embedding dimensions (L2 normalized)</div>
+
+                <div class="glass" style="display:flex; flex-direction:column; justify-content:center; align-items:center; gap:0.8rem; padding:1.5rem;">
+                    <div class="stat">
+                        <div class="stat-value">192</div>
+                        <div class="stat-label">Embedding dimensions (L2 normalized)</div>
+                    </div>
+                    <hr class="hr-subtle" style="width:100%;">
+                    <div style="display:flex; gap:1.5rem;">
+                        <div class="stat">
+                            <div class="stat-value" style="font-size:1.3rem;">FunASR</div>
+                            <div class="stat-label">Embedding model</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="font-size:1.3rem; color:var(--cyan);">COSINE</div>
+                            <div class="stat-label">Similarity metric</div>
+                        </div>
+                    </div>
                 </div>
-                <hr class="hr-subtle">
-                <div style="display:flex; gap:1rem; justify-content:center; margin-top:0.8rem;">
-                    <div class="stat">
-                        <div class="stat-value" style="font-size:1.5rem;">FunASR</div>
-                        <div class="stat-label">Embedding model</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" style="font-size:1.5rem; color:var(--purple);">Pyannote</div>
-                        <div class="stat-label">Diarization model</div>
-                    </div>
+
+                <div class="glass" style="padding:0.8rem 1rem;">
+                    <p class="dim" style="font-size:0.72rem;">Segment Selection Algorithm</p>
+                    <p class="muted mt-sm" style="font-size:0.82rem;">For each speaker, the orchestrator selects an optimal ~5s non-overlapping segment. Falls back to adjacent-segment concatenation (gap &le; 0.5s) to ensure clean embeddings without speaker interference.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- =============================================
-         SLIDE 11 — REAL-TIME FRONTEND
+         SLIDE 9 — REAL-TIME FRONTEND
          ============================================= -->
     <section class="slide" data-title="Frontend">
         <div class="grid-pattern"></div>
@@ -1110,7 +1009,7 @@
         <div class="reveal grid-3 mt-lg">
             <div class="glass glass-cyan">
                 <h3>Live Transcript Stream</h3>
-                <p class="muted mt-sm" style="font-size:0.85rem;">Token-by-token streaming via SSE. Speaker labels parsed and color-coded as they arrive. Cursor animation shows active transcription.</p>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Token-by-token streaming via SSE. Speaker labels parsed and color-coded as they arrive.</p>
             </div>
             <div class="glass glass-purple">
                 <h3>Agent Activity Panel</h3>
@@ -1118,7 +1017,7 @@
             </div>
             <div class="glass glass-green">
                 <h3>Interactive Timeline</h3>
-                <p class="muted mt-sm" style="font-size:0.85rem;">Multi-track speaker lanes with click-to-seek. Decision markers and ambiguity indicators with pulsing glow animation.</p>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Multi-track speaker lanes with click-to-seek. Decision markers and pulsing ambiguity indicators.</p>
             </div>
         </div>
         <div class="reveal grid-3 mt-md">
@@ -1131,8 +1030,8 @@
                 <p class="muted mt-sm" style="font-size:0.85rem;">Interactive card flow for resolving detected ambiguities. Confidence-weighted candidates with one-click assignment.</p>
             </div>
             <div class="glass glass-orange">
-                <h3>Pipeline Sidebar</h3>
-                <p class="muted mt-sm" style="font-size:0.85rem;">Vertical phase indicator with animated connectors. Percentage progress and phase transitions in real-time.</p>
+                <h3>Meeting Dynamics</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Per-speaker talk time percentages and interruption counts. Animated bar charts sorted by participation.</p>
             </div>
         </div>
     </section>
@@ -1160,12 +1059,12 @@
     </section>
 
     <!-- =============================================
-         SLIDE 13 — WHY IT MATTERS (USEFULNESS)
+         SLIDE 13 — WHY IT MATTERS
          ============================================= -->
     <section class="slide" data-title="Impact">
         <div class="gradient-mesh"></div>
         <p class="reveal section-label">Impact</p>
-        <h2 class="reveal">Real Users. Real Value.</h2>
+        <h2 class="reveal">Who This Helps</h2>
         <div class="reveal divider mt-md"></div>
 
         <div class="reveal grid-3 mt-lg">
@@ -1179,7 +1078,7 @@
             </div>
             <div class="glass glass-purple">
                 <h3>Compliance & Audit</h3>
-                <p class="muted mt-sm" style="font-size:0.85rem;">Timestamped, speaker-attributed records. Meeting dynamics metrics (talk time %, interruptions). Full evidence chain for every resolution.</p>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Timestamped, speaker-attributed records. Meeting dynamics metrics (talk time %, interruptions). Evidence chain for every resolution.</p>
             </div>
         </div>
 
@@ -1202,6 +1101,86 @@
                     <div class="stat-label">Manual steps</div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 14 — FUTURE VISION (Part 1)
+         ============================================= -->
+    <section class="slide" data-title="Future 1">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">Future Vision</p>
+        <h2 class="reveal">Where MeetingMind Goes Next</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="future-card glass-purple">
+                <span class="future-num">FUTURE 01</span>
+                <h3 class="purple mt-sm">Voxtral for Semantic Moment Detection</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">
+                    Voxtral Small (24B) can answer questions about audio directly: <span class="accent">"What was the most contested claim?"</span> or <span class="accent">"Did anyone express doubt about the Q3 deadline?"</span> — without transcribing first.
+                </p>
+                <p class="muted mt-sm" style="font-size:0.82rem;">
+                    Use this as a pre-processing pass to identify which segments need deep LLM analysis versus which can be summarized cheaply. Query the audio like a database, not just transcribe it.
+                </p>
+            </div>
+
+            <div class="future-card glass-magenta">
+                <span class="future-num">FUTURE 02</span>
+                <h3 class="magenta mt-sm">The "Dissent Surface"</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">
+                    Every meeting tool surfaces consensus. Nobody surfaces dissent. Detect hedged language, contradiction, and soft disagreement (<span class="accent">"I guess that could work"</span>) versus firm commitment (<span class="accent">"Absolutely, I'll own that"</span>).
+                </p>
+                <p class="muted mt-sm" style="font-size:0.82rem;">
+                    Render a visual Dissent Map: a heatmap of the conversation timeline where disagreement intensity is color-coded. Surface what every other tool hides.
+                </p>
+            </div>
+        </div>
+
+        <div class="reveal future-card glass-cyan mt-md">
+            <span class="future-num">FUTURE 03</span>
+            <h3 class="accent mt-sm">Retroactive Clarification via Async Voice</h3>
+            <p class="muted mt-sm" style="font-size:0.85rem;">
+                Instead of interrupting live meetings with AI clarification, flip it: after the meeting, generate voice questions (TTS) and send them as voice messages to the relevant person via Slack or email. <span class="accent">"Hey Marcus, it sounded like you were taking on the API migration — can you confirm and set a deadline?"</span> The response feeds back and resolves the minutes. Less impressive as a live demo, far more production-realistic.
+            </p>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 15 — FUTURE VISION (Part 2)
+         ============================================= -->
+    <section class="slide" data-title="Future 2">
+        <div class="gradient-mesh"></div>
+        <p class="reveal section-label">Future Vision</p>
+        <h2 class="reveal">Cross-Meeting Intelligence & UX</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="future-card glass-yellow">
+                <span class="future-num">FUTURE 04</span>
+                <h3 class="yellow mt-sm">Pre-Mortem: Meeting Debt Detection</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">
+                    After generating action items, query a vector-indexed store of past meetings to find semantically similar past commitments: <span class="accent">"This task resembles 'fix the auth flow' from March 14 — that one was never resolved."</span>
+                </p>
+                <p class="muted mt-sm" style="font-size:0.82rem;">
+                    Surface this as a warning: "Similar commitment made 6 weeks ago. Status unknown." Cross-meeting memory transforms minutes from a snapshot into a living accountability system.
+                </p>
+            </div>
+
+            <div class="future-card glass-green">
+                <span class="future-num">FUTURE 05</span>
+                <h3 class="green mt-sm">UX Beyond AI Defaults</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Design principles for the next iteration:</p>
+                <ul class="clean mt-sm">
+                    <li><span class="accent">Transcript as timeline</span> — horizontal speaker lanes like a multi-track editor. Ambiguities pulse. Resolved items turn green.</li>
+                    <li><span class="accent">Decision ledger</span> — who proposed, who seconded, who dissented, final status. Inspired by git commit history.</li>
+                    <li><span class="accent">Clarification as structured evidence</span> — "AMBIGUITY DETECTED. Referential. Line 14:32. Subject unresolved." Two buttons: Confirm or Correct.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="reveal glass mt-md" style="padding:0.8rem 1.2rem; text-align:center;">
+            <p class="muted" style="font-size:0.85rem;">These features build on the foundation we've shipped: the voiceprint memory, the agentic tool loop, and the structured output schema are all extensible by design.</p>
         </div>
     </section>
 
@@ -1234,13 +1213,14 @@
                 <div class="stat-label">Diarization</div>
             </div>
             <div class="stat">
-                <div class="stat-value" style="font-size:1.2rem; color:var(--yellow);">zvec</div>
-                <div class="stat-label">Memory</div>
+                <div class="stat-value" style="font-size:1.2rem; color:var(--cyan);">zvec</div>
+                <div class="stat-label">Voice Memory</div>
             </div>
         </div>
 
         <p class="reveal muted mt-lg" style="font-size:1rem;">
-            Agentic meeting intelligence. Acoustic-semantic fusion. Structured insights.
+            Agentic meeting intelligence. Acoustic-semantic fusion. Structured insights.<br>
+            <span class="dim" style="font-size:0.85rem;">Not just transcription — real meeting understanding.</span>
         </p>
     </section>
 
@@ -1249,11 +1229,6 @@
          PRESENTATION CONTROLLER
          ============================================= -->
     <script>
-        /* ===========================================
-           SlidePresentation — handles navigation,
-           scroll-triggered animations, progress bar,
-           navigation dots, and keyboard/touch input
-           =========================================== */
         class SlidePresentation {
             constructor() {
                 this.slides = Array.from(document.querySelectorAll('.slide'));
@@ -1267,12 +1242,9 @@
                 this.bindKeys();
                 this.bindTouch();
                 this.bindWheel();
-
-                // Initial check
                 this.updateVisibility();
             }
 
-            /* Build navigation dots on right side */
             buildNavDots() {
                 const nav = document.getElementById('navDots');
                 this.slides.forEach((_, i) => {
@@ -1285,7 +1257,6 @@
                 this.dots = Array.from(nav.querySelectorAll('.nav-dot'));
             }
 
-            /* Intersection Observer for scroll-triggered reveals */
             setupObserver() {
                 const obs = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
@@ -1300,32 +1271,22 @@
                 this.slides.forEach(s => obs.observe(s));
             }
 
-            /* Mark a slide as the current active */
             setActive(idx) {
                 this.currentIndex = idx;
-
-                // Update dots
                 this.dots.forEach((d, i) => d.classList.toggle('active', i === idx));
-
-                // Update counter
                 document.getElementById('slideNum').textContent = idx + 1;
-
-                // Update progress bar
                 const pct = ((idx + 1) / this.total) * 100;
                 document.getElementById('progressBar').style.width = pct + '%';
             }
 
-            /* Scroll to a specific slide */
             goTo(idx) {
                 if (idx < 0 || idx >= this.total) return;
                 this.slides[idx].scrollIntoView({ behavior: 'smooth' });
             }
 
-            /* Navigate relative to current */
             next() { this.goTo(this.currentIndex + 1); }
             prev() { this.goTo(this.currentIndex - 1); }
 
-            /* Keyboard navigation */
             bindKeys() {
                 document.addEventListener('keydown', (e) => {
                     switch (e.key) {
@@ -1352,7 +1313,6 @@
                 });
             }
 
-            /* Touch/swipe support */
             bindTouch() {
                 let startY = 0;
                 document.addEventListener('touchstart', (e) => {
@@ -1368,7 +1328,6 @@
                 }, { passive: true });
             }
 
-            /* Mouse wheel with debounce */
             bindWheel() {
                 let last = 0;
                 document.addEventListener('wheel', (e) => {
@@ -1382,7 +1341,6 @@
                 }, { passive: true });
             }
 
-            /* Force-check visibility on load */
             updateVisibility() {
                 const viewH = window.innerHeight;
                 this.slides.forEach((s, i) => {
@@ -1395,7 +1353,6 @@
             }
         }
 
-        // Initialize
         new SlidePresentation();
     </script>
 </body>

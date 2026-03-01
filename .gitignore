@@ -34,3 +34,4 @@ dist/
 /.agents
 AGENTS.md
 /.agent
+skills-lock.json
