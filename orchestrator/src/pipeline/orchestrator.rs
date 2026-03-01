@@ -263,10 +263,10 @@ async fn proactive_acoustic_match(
             .text("start_time", seg_start.to_string())
             .text("end_time", seg_end.to_string());
 
-        let embed_result = client
+        let embed_result = gpu_auth(client
             .post(format!("{}/embed", gpu_base))
             .multipart(form)
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(30)))
             .send()
             .await;
 

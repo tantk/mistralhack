@@ -204,10 +204,10 @@ async fn enroll_speaker(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let form = reqwest::multipart::Form::new().part("audio", part);
 
-    let resp = client
+    let resp = gpu_auth(client
         .post(format!("{}/embed", gpu_url))
         .multipart(form)
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(60)))
         .send()
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("GPU service unreachable: {e}")))?;

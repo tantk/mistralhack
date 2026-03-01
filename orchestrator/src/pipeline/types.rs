@@ -13,6 +13,20 @@ pub fn diarization_url() -> String {
     env::var("DIARIZATION_URL").unwrap_or_else(|_| "http://192.168.0.105:8001".into())
 }
 
+pub fn gpu_token() -> String {
+    env::var("GPU_TOKEN").unwrap_or_default()
+}
+
+/// Build a reqwest RequestBuilder with optional GPU auth header.
+pub fn gpu_auth(rb: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    let token = gpu_token();
+    if token.is_empty() {
+        rb
+    } else {
+        rb.header("Authorization", format!("Bearer {token}"))
+    }
+}
+
 pub fn mistral_api_key() -> String {
     env::var("MISTRAL_API_KEY").unwrap_or_default()
 }
@@ -63,9 +77,9 @@ impl GpuHealthCache {
     /// updates cache, returns result.
     pub async fn check_now(&self) -> bool {
         let url = format!("{}/health", diarization_url());
-        let result = reqwest::Client::new()
+        let result = gpu_auth(reqwest::Client::new()
             .get(&url)
-            .timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(5)))
             .send()
             .await
             .map(|r| r.status().is_success())
