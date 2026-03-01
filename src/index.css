@@ -237,6 +237,31 @@ button { cursor: pointer; border: none; background: none; font: inherit; color: 
   text-align: center;
 }
 
+.attendees-input-wrapper {
+  width: 100%;
+}
+
+.attendees-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.attendees-input:focus {
+  border-color: var(--amber);
+}
+
+.attendees-input::placeholder {
+  color: var(--text-dim);
+}
+
 /* ─── Processing screen ─────────────────────────────────────── */
 .processing-screen {
   display: flex;
@@ -396,6 +421,54 @@ button { cursor: pointer; border: none; background: none; font: inherit; color: 
   color: var(--text-dim);
   text-align: center;
   font-family: var(--font-mono);
+}
+
+.acoustic-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+}
+
+.acoustic-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.acoustic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acoustic-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.acoustic-map {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acoustic-confidence {
+  flex-shrink: 0;
+}
+
+.acoustic-confirmed {
+  color: var(--green);
+}
+
+.acoustic-tentative {
+  color: var(--amber);
 }
 
 /* ─── Results screen ─────────────────────────────────────────── */

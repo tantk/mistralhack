@@ -8,9 +8,10 @@ import type {
   Word,
   ToolCallEntry,
   SpeakerResolutionEntry,
+  AcousticMatchEntry,
 } from '../api/client'
 
-export type Phase = 'transcribing' | 'diarizing' | 'resolving' | 'analyzing'
+export type Phase = 'transcribing' | 'diarizing' | 'acoustic_matching' | 'resolving' | 'analyzing'
 export type Stage = 'idle' | 'uploading' | 'processing' | 'results'
 export type ResultTab = 'timeline' | 'ledger' | 'clarifications'
 
@@ -22,6 +23,7 @@ interface AppState {
   stage: Stage
   phase: Phase | null
   jobId: string | null
+  pipelineError: string | null
   uploadProgress: number
 
   transcript: string
@@ -31,6 +33,7 @@ interface AppState {
   language: string | null
 
   segments: Segment[]
+  acousticMatches: AcousticMatchEntry[]
   decisions: Decision[]
   ambiguities: Ambiguity[]
   actionItems: ActionItem[]
@@ -48,7 +51,8 @@ interface AppState {
   // actions
   setStage: (s: Stage) => void
   setPhase: (p: Phase | null) => void
-  setJobId: (id: string) => void
+  setJobId: (id: string | null) => void
+  setPipelineError: (msg: string | null) => void
   setUploadProgress: (p: number) => void
   setTranscript: (t: string) => void
   appendTranscript: (token: string) => void
@@ -57,6 +61,7 @@ interface AppState {
   setWords: (w: Word[]) => void
   setLanguage: (l: string | null) => void
   setSegments: (s: Segment[]) => void
+  setAcousticMatches: (m: AcousticMatchEntry[]) => void
   setDecisions: (d: Decision[]) => void
   setAmbiguities: (a: Ambiguity[]) => void
   setActionItems: (a: ActionItem[]) => void
@@ -75,6 +80,7 @@ const initial = {
   stage: 'idle' as Stage,
   phase: null as Phase | null,
   jobId: null as string | null,
+  pipelineError: null as string | null,
   uploadProgress: 0,
   transcript: '',
   revealedWordCount: 0,
@@ -82,6 +88,7 @@ const initial = {
   words: [] as Word[],
   language: null as string | null,
   segments: [] as Segment[],
+  acousticMatches: [] as AcousticMatchEntry[],
   decisions: [] as Decision[],
   ambiguities: [] as Ambiguity[],
   actionItems: [] as ActionItem[],
@@ -99,6 +106,7 @@ export const useStore = create<AppState>((set) => ({
   setStage: (stage) => set({ stage }),
   setPhase: (phase) => set({ phase }),
   setJobId: (jobId) => set({ jobId }),
+  setPipelineError: (pipelineError) => set({ pipelineError }),
   setUploadProgress: (uploadProgress) => set({ uploadProgress }),
   setTranscript: (transcript) => set({ transcript }),
   appendTranscript: (token) => set((s) => ({ transcript: s.transcript + token })),
@@ -107,6 +115,7 @@ export const useStore = create<AppState>((set) => ({
   setWords: (words) => set({ words }),
   setLanguage: (language) => set({ language }),
   setSegments: (segments) => set({ segments }),
+  setAcousticMatches: (acousticMatches) => set({ acousticMatches }),
   setDecisions: (decisions) => set({ decisions }),
   setAmbiguities: (ambiguities) => set({ ambiguities }),
   setActionItems: (actionItems) => set({ actionItems }),

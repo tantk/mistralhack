@@ -3,6 +3,8 @@ import { useStore } from '../store/appStore'
 import {
   TranscriptCompleteSchema,
   DiarizationCompleteSchema,
+  AcousticMatchesCompleteSchema,
+  SegmentsResolvedSchema,
   AnalysisCompleteSchema,
   ToolCallSchema,
   ToolResultSchema,
@@ -18,6 +20,7 @@ import { getBackend } from '../api/backend'
  */
 export function useSSE(jobId: string | null) {
   const esRef = useRef<EventSource | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const setPhase = useStore((s) => s.setPhase)
   const setTranscript = useStore((s) => s.setTranscript)
@@ -25,6 +28,7 @@ export function useSSE(jobId: string | null) {
   const setWords = useStore((s) => s.setWords)
   const setLanguage = useStore((s) => s.setLanguage)
   const setSegments = useStore((s) => s.setSegments)
+  const setAcousticMatches = useStore((s) => s.setAcousticMatches)
   const setDecisions = useStore((s) => s.setDecisions)
   const setAmbiguities = useStore((s) => s.setAmbiguities)
   const setActionItems = useStore((s) => s.setActionItems)
@@ -33,11 +37,100 @@ export function useSSE(jobId: string | null) {
   const updateLastToolResult = useStore((s) => s.updateLastToolResult)
   const addSpeakerResolution = useStore((s) => s.addSpeakerResolution)
   const setStage = useStore((s) => s.setStage)
+  const setJobId = useStore((s) => s.setJobId)
+  const setPipelineError = useStore((s) => s.setPipelineError)
+
+  function clearPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }
+
+  function applyCompleteResult(data: any) {
+    if (data.transcript) setTranscript(data.transcript)
+    if (data.segments) setSegments(data.segments)
+    if (data.decisions) setDecisions(data.decisions)
+    if (data.ambiguities) setAmbiguities(data.ambiguities)
+    if (data.action_items) setActionItems(data.action_items)
+    if (data.meeting_dynamics) setMeetingDynamics(data.meeting_dynamics)
+    setPipelineError(null)
+    setStage('results')
+    setPhase(null)
+  }
+
+  function applyErrorResult(data: any) {
+    const errorMessage = typeof data.error === 'string' && data.error.trim().length > 0
+      ? data.error
+      : 'Meeting processing failed'
+    setPipelineError(errorMessage)
+    setStage('idle')
+    setPhase(null)
+    setJobId(null)
+  }
+
+  function startPolling(id: string, base: string) {
+    clearPolling()
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${base}/jobs/${id}/result`, {
+          headers: authHeaders(),
+        })
+        if (!res.ok) return
+        const data = await res.json()
+
+        if (data.status === 'processing') {
+          if (data.phase) setPhase(data.phase)
+          return
+        }
+
+        if (data.status === 'complete') {
+          clearPolling()
+          applyCompleteResult(data)
+          return
+        }
+
+        if (data.status === 'error') {
+          clearPolling()
+          applyErrorResult(data)
+          return
+        }
+      } catch {
+        // transient - keep polling
+      }
+    }, 500)
+  }
+
+  async function finalizeFromResult(id: string, base: string) {
+    try {
+      const res = await fetch(`${base}/jobs/${id}/result`, {
+        headers: authHeaders(),
+      })
+      if (!res.ok) {
+        applyErrorResult({ error: `Failed to load job result (HTTP ${res.status})` })
+        return
+      }
+      const data = await res.json()
+      if (data.status === 'complete') {
+        applyCompleteResult(data)
+        return
+      }
+      if (data.status === 'error') {
+        applyErrorResult(data)
+        return
+      }
+      startPolling(id, base)
+    } catch {
+      startPolling(id, base)
+    }
+  }
 
   useEffect(() => {
     if (!jobId) return
 
+    const currentJobId = jobId
     let cancelled = false
+    setPipelineError(null)
 
     async function connect() {
       const base = await getBackend()
@@ -45,7 +138,7 @@ export function useSSE(jobId: string | null) {
 
       const token = getApiKey()
       const query = token ? `?token=${encodeURIComponent(token)}` : ''
-      const es = new EventSource(`${base}/jobs/${jobId}/events${query}`)
+      const es = new EventSource(`${base}/jobs/${currentJobId}/events${query}`)
       esRef.current = es
 
       es.addEventListener('phase_start', (e) => {
@@ -67,6 +160,16 @@ export function useSSE(jobId: string | null) {
 
       es.addEventListener('diarization_complete', (e) => {
         const data = DiarizationCompleteSchema.parse(JSON.parse(e.data))
+        setSegments(data.segments)
+      })
+
+      es.addEventListener('acoustic_matches_complete', (e) => {
+        const data = AcousticMatchesCompleteSchema.parse(JSON.parse(e.data))
+        setAcousticMatches(data.matches)
+      })
+
+      es.addEventListener('segments_resolved', (e) => {
+        const data = SegmentsResolvedSchema.parse(JSON.parse(e.data))
         setSegments(data.segments)
       })
 
@@ -95,13 +198,14 @@ export function useSSE(jobId: string | null) {
 
       es.addEventListener('done', () => {
         es.close()
-        setStage('results')
-        setPhase(null)
+        clearPolling()
+        void finalizeFromResult(currentJobId, base)
       })
 
       es.onerror = () => {
         es.close()
-        startPolling(jobId!, base)
+        clearPolling()
+        startPolling(currentJobId, base)
       }
     }
 
@@ -110,41 +214,26 @@ export function useSSE(jobId: string | null) {
     return () => {
       cancelled = true
       esRef.current?.close()
+      clearPolling()
     }
   }, [
-    jobId, setPhase, setTranscript, appendTranscript, setWords, setLanguage, setSegments,
-    setDecisions, setAmbiguities, setActionItems, setMeetingDynamics,
-    addToolCall, updateLastToolResult, addSpeakerResolution, setStage,
+    jobId,
+    setPhase,
+    setTranscript,
+    appendTranscript,
+    setWords,
+    setLanguage,
+    setSegments,
+    setAcousticMatches,
+    setDecisions,
+    setAmbiguities,
+    setActionItems,
+    setMeetingDynamics,
+    addToolCall,
+    updateLastToolResult,
+    addSpeakerResolution,
+    setStage,
+    setJobId,
+    setPipelineError,
   ])
-
-  function startPolling(id: string, base: string) {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${base}/jobs/${id}/result`, {
-          headers: authHeaders(),
-        })
-        if (!res.ok) return
-        const data = await res.json()
-
-        if (data.status === 'processing') {
-          if (data.phase) setPhase(data.phase)
-          return
-        }
-
-        if (data.status === 'complete') {
-          clearInterval(interval)
-          if (data.transcript) setTranscript(data.transcript)
-          if (data.segments) setSegments(data.segments)
-          if (data.decisions) setDecisions(data.decisions)
-          if (data.ambiguities) setAmbiguities(data.ambiguities)
-          if (data.action_items) setActionItems(data.action_items)
-          if (data.meeting_dynamics) setMeetingDynamics(data.meeting_dynamics)
-          setStage('results')
-          setPhase(null)
-        }
-      } catch {
-        // transient — keep polling
-      }
-    }, 500)
-  }
 }

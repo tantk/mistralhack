@@ -3,7 +3,7 @@ import { useStore } from '../store/appStore'
 import { useSSE } from '../hooks/useSSE'
 
 const PHASES = [
-  { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech → Text' },
+  { id: 'transcribing', label: 'VOXTRAL', sub: 'Speech -> Text' },
   { id: 'diarizing', label: 'PYANNOTE + ERES2NET', sub: 'Speaker Separation' },
   { id: 'resolving', label: 'MISTRAL AGENT', sub: 'Speaker Resolution' },
   { id: 'analyzing', label: 'MISTRAL LARGE 3', sub: 'Decision Intelligence' },
@@ -13,14 +13,21 @@ type PhaseId = typeof PHASES[number]['id']
 
 const PHASE_ORDER: PhaseId[] = ['transcribing', 'diarizing', 'resolving', 'analyzing']
 
-// acoustic_matching is a sub-phase of diarizing — map it so the UI stays on "diarizing"
+// acoustic_matching is a sub-phase of diarizing - map it so the UI stays on "diarizing"
 function normalizePhase(phase: string | null): PhaseId | null {
   if (phase === 'acoustic_matching') return 'diarizing'
   return phase as PhaseId | null
 }
 
 export default function Processing() {
-  const { jobId, phase, transcript, toolCalls, speakerResolutions } = useStore()
+  const {
+    jobId,
+    phase,
+    transcript,
+    toolCalls,
+    speakerResolutions,
+    acousticMatches,
+  } = useStore()
 
   // Connect SSE (or fallback poll) for this job
   useSSE(jobId)
@@ -34,7 +41,7 @@ export default function Processing() {
   return (
     <div className="processing-screen">
       <header className="upload-header">
-        <div className="logo-mark">▶</div>
+        <div className="logo-mark">&#9654;</div>
         <span className="logo-text">MEETINGMIND</span>
       </header>
 
@@ -97,7 +104,7 @@ export default function Processing() {
           </div>
         </div>
 
-        {/* Agent activity panel — visible during resolving phase */}
+        {/* Agent activity panel - visible during resolving phase */}
         {phase === 'resolving' && (
           <motion.div
             className="agent-activity-panel"
@@ -129,7 +136,7 @@ export default function Processing() {
                   {speakerResolutions.map((sr, i) => (
                     <div key={i} className="agent-resolution-entry">
                       <span className="resolution-arrow">
-                        {sr.label} → {sr.name}
+                        {sr.label} -&gt; {sr.name}
                       </span>
                       <span className="resolution-confidence">
                         ({(sr.confidence * 100).toFixed(0)}%)
@@ -142,8 +149,26 @@ export default function Processing() {
           </motion.div>
         )}
 
+        {acousticMatches.length > 0 && (
+          <div className="acoustic-panel" data-testid="acoustic-matches-panel">
+            <p className="acoustic-title">ACOUSTIC MATCH CANDIDATES</p>
+            <div className="acoustic-list">
+              {acousticMatches.map((m, i) => (
+                <div key={`${m.diarization_speaker}-${m.matched_name}-${i}`} className="acoustic-item">
+                  <span className="acoustic-map">
+                    {m.diarization_speaker} -&gt; {m.matched_name}
+                  </span>
+                  <span className={`acoustic-confidence ${m.confirmed ? 'acoustic-confirmed' : 'acoustic-tentative'}`}>
+                    {(m.cosine_similarity * 100).toFixed(0)}% {m.confirmed ? 'confirmed' : 'tentative'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="processing-hint">
-          Pipeline running — this may take a few minutes for long recordings.
+          Pipeline running - this may take a few minutes for long recordings.
         </p>
       </main>
     </div>

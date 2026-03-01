@@ -16,8 +16,10 @@ export default function Upload() {
   const [dragOver, setDragOver] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attendeesStr, setAttendeesStr] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const store = useStore()
+  const pipelineError = useStore((s) => s.pipelineError)
 
   const validate = (f: File) => {
     if (!ACCEPTED.includes(f.type) && !ACCEPTED_EXT.some(e => f.name.endsWith(e))) {
@@ -52,9 +54,15 @@ export default function Upload() {
 
   const process = async () => {
     if (!file) return
+    setError(null)
+    store.setPipelineError(null)
     store.setStage('uploading')
     try {
-      const jobId = await submitJob(file)
+      const attendees = attendeesStr
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const jobId = await submitJob(file, attendees)
       store.setJobId(jobId)
       store.setStage('processing')
       store.setPhase('transcribing')
@@ -141,14 +149,14 @@ export default function Upload() {
         </div>
 
         <AnimatePresence>
-          {error && (
+          {(error || pipelineError) && (
             <motion.p
               className="error-msg"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
             >
-              {error}
+              {error || pipelineError}
             </motion.p>
           )}
         </AnimatePresence>
@@ -162,6 +170,19 @@ export default function Upload() {
         >
           PROCESS MEETING
         </motion.button>
+
+        {file && (
+          <div className="attendees-input-wrapper">
+            <input
+              type="text"
+              className="attendees-input"
+              placeholder="Attendees (comma-separated, optional)"
+              value={attendeesStr}
+              onChange={(e) => setAttendeesStr(e.target.value)}
+              data-testid="attendees-input"
+            />
+          </div>
+        )}
 
         <p className="upload-footer-note">
           Audio stays on your server. Nothing leaves your infrastructure.
