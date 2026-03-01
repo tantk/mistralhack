@@ -1,34 +1,33 @@
 @import "tailwindcss" theme(static);
 
 @theme {
-  --color-void: #050505;
-  --color-neon-cyan: #06f1f9;
-  --color-neon-magenta: #FF003C;
-  --color-neon-yellow: #FFD600;
-  --color-surface: rgba(20, 25, 30, 0.65);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-bg-primary: #0a1a1b;
+  --color-bg-surface: #0f2223;
+  --color-bg-elevated: #132d2e;
+  --color-bg-card: rgba(15, 34, 35, 0.85);
+  --color-accent: #06f1f9;
+  --color-accent-muted: rgba(6, 241, 249, 0.15);
+  --color-accent-subtle: rgba(6, 241, 249, 0.08);
+  --color-border: rgba(6, 241, 249, 0.12);
+  --color-border-strong: rgba(6, 241, 249, 0.25);
+  --color-danger: #FF003C;
+  --color-warning: #FFD600;
+  --color-success: #22c55e;
 
   --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-hud: 'Rajdhani', system-ui, sans-serif;
-  --font-code: 'Fira Code', 'Courier New', monospace;
+  --font-mono: 'Fira Code', 'Courier New', monospace;
 
   --animate-blink: blink 1s step-end infinite;
-  --animate-glow-pulse: glow-pulse 2.5s ease-in-out infinite;
-  --animate-scanline: scanline 8s linear infinite;
+  --animate-pulse-soft: pulse-soft 2.5s ease-in-out infinite;
 
   @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
   }
 
-  @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0); }
-    50% { box-shadow: 0 0 8px 3px rgba(255, 0, 60, 0.3); }
-  }
-
-  @keyframes scanline {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100%); }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
   }
 }
 
@@ -38,8 +37,8 @@ html, body, #root {
 }
 
 body {
-  background: #050505;
-  color: #f4f4f5;
+  background: #0a1a1b;
+  color: #e2e8f0;
   font-family: 'Space Grotesk', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
@@ -47,96 +46,42 @@ body {
   overflow-x: hidden;
 }
 
-/* ─── Glass panel utility ──────────────────────────────────── */
-.glass-panel {
-  background: rgba(20, 25, 30, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  position: relative;
-  overflow: hidden;
-}
-
-.glass-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%);
-  pointer-events: none;
-}
-
-/* ─── Neon text glow ───────────────────────────────────────── */
-.neon-text-cyan {
-  color: #06f1f9;
-  text-shadow: 0 0 8px rgba(6, 241, 249, 0.6), 0 0 20px rgba(6, 241, 249, 0.3);
-}
-
-.neon-text-magenta {
-  color: #FF003C;
-  text-shadow: 0 0 8px rgba(255, 0, 60, 0.6), 0 0 20px rgba(255, 0, 60, 0.3);
-}
-
-.neon-text-yellow {
-  color: #FFD600;
-  text-shadow: 0 0 8px rgba(255, 214, 0, 0.6), 0 0 20px rgba(255, 214, 0, 0.3);
-}
-
-/* ─── Grid background ──────────────────────────────────────── */
-.grid-bg {
-  background-image:
-    linear-gradient(rgba(6, 241, 249, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(6, 241, 249, 0.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-/* ─── Scanline overlay ─────────────────────────────────────── */
-.scanline-overlay::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    transparent 50%,
-    rgba(6, 241, 249, 0.02) 50%
-  );
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* ─── Cyber scrollbar ──────────────────────────────────────── */
-.cyber-scrollbar::-webkit-scrollbar {
+/* ─── Scrollbar ────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 
-.cyber-scrollbar::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.cyber-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(6, 241, 249, 0.3);
-  border-radius: 2px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(6, 241, 249, 0.2);
+  border-radius: 10px;
 }
 
-.cyber-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 241, 249, 0.5);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 241, 249, 0.35);
 }
 
 /* Firefox */
-.cyber-scrollbar {
+.custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(6, 241, 249, 0.3) transparent;
+  scrollbar-color: rgba(6, 241, 249, 0.2) transparent;
 }
 
-/* ─── Glow box shadows (utilities) ─────────────────────────── */
+/* ─── Card surface ─────────────────────────────────────────── */
+.card-surface {
+  background: rgba(15, 34, 35, 0.85);
+  border: 1px solid rgba(6, 241, 249, 0.1);
+  border-radius: 12px;
+}
+
+/* ─── Glow utilities ───────────────────────────────────────── */
 .shadow-glow-cyan {
-  box-shadow: 0 0 20px rgba(6, 241, 249, 0.35), 0 0 60px rgba(6, 241, 249, 0.15);
+  box-shadow: 0 4px 24px rgba(6, 241, 249, 0.12), 0 0 48px rgba(6, 241, 249, 0.06);
 }
 
-.shadow-glow-magenta {
-  box-shadow: 0 0 20px rgba(255, 0, 60, 0.35), 0 0 60px rgba(255, 0, 60, 0.15);
-}
-
-.shadow-glow-yellow {
-  box-shadow: 0 0 20px rgba(255, 214, 0, 0.35), 0 0 60px rgba(255, 214, 0, 0.15);
+.shadow-glow-danger {
+  box-shadow: 0 4px 24px rgba(255, 0, 60, 0.12), 0 0 48px rgba(255, 0, 60, 0.06);
 }

@@ -78,20 +78,23 @@ export default function Upload() {
     <div className="upload-screen min-h-screen flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-lg flex flex-col items-center gap-6">
         <div className="flex items-center gap-3 mb-4">
-          <span className="neon-text-cyan text-2xl">&#9654;</span>
-          <span className="font-hud font-bold text-xl tracking-[0.15em] text-zinc-100 uppercase">
-            MeetingMind
+          <div className="w-8 h-8 text-accent">
+            <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+              <path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z" />
+            </svg>
+          </div>
+          <span className="font-display font-bold text-xl tracking-tight text-slate-100">
+            MeetingIntel AI
           </span>
         </div>
 
         <div
-          className={`w-full glass-panel transition-all duration-200 cursor-pointer ${
-            dragOver
-              ? 'border-neon-cyan shadow-glow-cyan'
+          className={`w-full card-surface transition-all duration-200 cursor-pointer ${dragOver
+              ? 'border-accent shadow-glow-cyan'
               : file
                 ? 'cursor-default'
-                : 'border-dashed border-glass-border hover:border-neon-cyan/50'
-          } ${file ? 'p-5' : 'p-12'}`}
+                : 'border-dashed hover:border-accent/40'
+            } ${file ? 'p-5' : 'p-12'}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
@@ -115,14 +118,14 @@ export default function Upload() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                className="flex flex-col items-center gap-4 relative z-10"
+                className="flex flex-col items-center gap-4"
               >
-                <Icon name="cloud_upload" size={48} className="text-zinc-600" />
-                <p className="font-display text-sm text-zinc-200">
+                <Icon name="cloud_upload" size={48} className="text-slate-600" />
+                <p className="font-display text-sm text-slate-200">
                   Drop audio or video file here
                 </p>
-                <p className="font-hud text-xs tracking-[0.1em] text-zinc-600 uppercase">
-                  WAV Â· MP3 Â· MP4 Â· M4A
+                <p className="text-xs tracking-widest text-slate-600 uppercase">
+                  WAV · MP3 · MP4 · M4A
                 </p>
               </motion.div>
             ) : (
@@ -131,15 +134,15 @@ export default function Upload() {
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex items-center gap-4 relative z-10"
+                className="flex items-center gap-4"
               >
-                <Icon name="music_note" size={24} className="text-neon-cyan flex-shrink-0" />
+                <Icon name="music_note" size={24} className="text-accent flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="file-name font-code text-sm text-zinc-200 truncate">{file.name}</p>
-                  <p className="file-size text-xs text-zinc-500 mt-0.5">{formatBytes(file.size)}</p>
+                  <p className="font-mono text-sm text-slate-200 truncate">{file.name}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{formatBytes(file.size)}</p>
                 </div>
                 <button
-                  className="text-zinc-600 hover:text-neon-magenta transition-colors flex-shrink-0 cursor-pointer"
+                  className="text-slate-600 hover:text-danger transition-colors flex-shrink-0 cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); setFile(null); store.setAudioUrl(null) }}
                   aria-label="Remove file"
                 >
@@ -153,7 +156,7 @@ export default function Upload() {
         <AnimatePresence>
           {(error || pipelineError) && (
             <motion.p
-              className="font-code text-xs text-neon-magenta text-center overflow-hidden"
+              className="font-mono text-xs text-danger text-center overflow-hidden"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -175,7 +178,7 @@ export default function Upload() {
         {file && (
           <input
             type="text"
-            className="w-full glass-panel px-3 py-2.5 text-xs font-code text-zinc-200 placeholder:text-zinc-600 outline-none border border-glass-border focus:border-neon-cyan"
+            className="w-full card-surface px-3 py-2.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 outline-none border border-slate-800 focus:border-accent"
             placeholder="Attendees (comma-separated, optional)"
             value={attendeesStr}
             onChange={(e) => setAttendeesStr(e.target.value)}
@@ -183,7 +186,7 @@ export default function Upload() {
           />
         )}
 
-        <p className="text-xs text-zinc-600 font-code text-center">
+        <p className="text-xs text-slate-600 text-center">
           Audio stays on your server. Nothing leaves your infrastructure.
         </p>
       </div>
