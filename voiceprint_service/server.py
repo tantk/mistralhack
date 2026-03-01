@@ -117,7 +117,8 @@ def identify(req: IdentifyRequest):
         {
             "name": doc.field("name") or "unknown",
             "id": doc.id,
-            "similarity": doc.score if doc.score is not None else 0.0,
+            # zvec cosine returns distance (0=identical), convert to similarity (1=identical)
+            "similarity": 1.0 - doc.score if doc.score is not None else 0.0,
         }
         for doc in results
     ]
