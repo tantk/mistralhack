@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 
 import zvec
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI(title="MeetingMind VectorDB")
@@ -34,23 +34,24 @@ def get_or_create_collection() -> zvec.Collection:
         return collection
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    zvec.init()
 
     try:
         collection = zvec.open(COLLECTION_PATH)
     except Exception:
+        import shutil
+
         if Path(COLLECTION_PATH).exists():
-            import shutil
             shutil.rmtree(COLLECTION_PATH)
 
-        schema = zvec.CollectionSchema("voiceprints")
-        schema.add_field(zvec.VectorSchema.fp32("embedding", EMBEDDING_DIM))
-        schema.add_field(zvec.FieldSchema.string("name"))
-        collection = zvec.create_and_open(COLLECTION_PATH, schema)
-        collection.create_index(
-            "embedding",
-            zvec.IndexParams.flat(zvec.MetricType.Cosine, zvec.QuantizeType.Undefined),
+        schema = zvec.CollectionSchema(
+            name="voiceprints",
+            fields=zvec.FieldSchema("name", zvec.DataType.STRING, nullable=True),
+            vectors=zvec.VectorSchema(
+                "embedding", zvec.DataType.VECTOR_FP32, EMBEDDING_DIM
+            ),
         )
+        collection = zvec.create_and_open(path=COLLECTION_PATH, schema=schema)
+        collection.create_index("embedding", zvec.FlatIndexParam(metric_type=zvec.MetricType.COSINE))
 
     return collection
 
@@ -58,6 +59,7 @@ def get_or_create_collection() -> zvec.Collection:
 @app.on_event("startup")
 def startup():
     global speakers
+    zvec.init()
     speakers = load_speakers()
     get_or_create_collection()
 
@@ -88,10 +90,10 @@ def enroll(req: EnrollRequest):
     col = get_or_create_collection()
     speaker_id = str(uuid.uuid4())
 
-    doc = (
-        zvec.Doc.id(speaker_id)
-        .with_vector("embedding", req.embedding)
-        .with_string("name", req.name)
+    doc = zvec.Doc(
+        id=speaker_id,
+        vectors={"embedding": req.embedding},
+        fields={"name": req.name},
     )
     col.insert([doc])
 
@@ -105,19 +107,17 @@ def enroll(req: EnrollRequest):
 def identify(req: IdentifyRequest):
     col = get_or_create_collection()
 
-    query = (
-        zvec.VectorQuery("embedding")
-        .topk(req.top_k)
-        .output_fields(["name"])
-        .vector(req.embedding)
+    results = col.query(
+        vectors=zvec.VectorQuery("embedding", vector=req.embedding),
+        topk=req.top_k,
+        output_fields=["name"],
     )
-    results = col.query(query)
 
     matches = [
         {
-            "name": doc.get_string("name"),
-            "id": doc.pk(),
-            "similarity": doc.score(),
+            "name": doc.field("name") or "unknown",
+            "id": doc.id,
+            "similarity": doc.score if doc.score is not None else 0.0,
         }
         for doc in results
     ]
