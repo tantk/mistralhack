@@ -49,7 +49,7 @@ def main() -> None:
     api.upload_folder(
         folder_path=script_dir,
         repo_id=REPO_ID,
-        allow_patterns=["app.py", "Dockerfile", "requirements.txt", "README.md"],
+        allow_patterns=["app.py", "voxtral_inference.py", "Dockerfile", "requirements.txt", "README.md"],
     )
     print(f"Repo updated: https://huggingface.co/{REPO_ID}")
 

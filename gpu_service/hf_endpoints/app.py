@@ -7,7 +7,6 @@ import io
 import json
 import logging
 import os
-import re
 import threading
 from contextlib import asynccontextmanager
 
@@ -19,6 +18,8 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from pydub import AudioSegment
 from sse_starlette.sse import EventSourceResponse
+
+from voxtral_inference import VoxtralModel
 
 logger = logging.getLogger("gpu_service")
 
@@ -32,18 +33,14 @@ PYANNOTE_MIN_SPEAKERS = int(os.environ.get("PYANNOTE_MIN_SPEAKERS", "1"))
 PYANNOTE_MAX_SPEAKERS = int(os.environ.get("PYANNOTE_MAX_SPEAKERS", "10"))
 TARGET_SR = 16000
 
+MODEL_DIR = os.environ.get("VOXTRAL_MODEL_DIR", "/repository/voxtral-model")
+
 # ---------------------------------------------------------------------------
 # Singletons
 # ---------------------------------------------------------------------------
 _diarize_pipeline = None
 _embed_model = None
-_voxtral_model = None
-_voxtral_processor = None
-
-VOXTRAL_MODEL_ID = "mistralai/Voxtral-Mini-4B-Realtime-2602"
-
-# Markers to strip from Voxtral output
-_MARKER_RE = re.compile(r"\[STREAMING_PAD\]|\[STREAMING_WORD\]")
+_voxtral: VoxtralModel | None = None
 
 
 def _load_diarize_pipeline():
@@ -68,26 +65,12 @@ def _load_embed_model():
 
 
 def _load_voxtral():
-    """Lazy-load Voxtral model and processor (first call only)."""
-    global _voxtral_model, _voxtral_processor
-    if _voxtral_model is None:
-        from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
-
-        logger.info("Loading Voxtral model %s ...", VOXTRAL_MODEL_ID)
-        _voxtral_processor = AutoProcessor.from_pretrained(
-            VOXTRAL_MODEL_ID, trust_remote_code=True
-        )
-        _voxtral_model = AutoModelForSpeechSeq2Seq.from_pretrained(
-            VOXTRAL_MODEL_ID, torch_dtype=torch.float16, trust_remote_code=True
-        ).to("cuda")
+    global _voxtral
+    if _voxtral is None:
+        logger.info("Loading Voxtral from %s ...", MODEL_DIR)
+        _voxtral = VoxtralModel(MODEL_DIR)
         logger.info("Voxtral model loaded.")
-    return _voxtral_model, _voxtral_processor
-
-
-def _clean_voxtral_text(text: str) -> str:
-    """Strip Voxtral streaming markers and collapse whitespace."""
-    text = _MARKER_RE.sub("", text)
-    return " ".join(text.split()).strip()
+    return _voxtral
 
 
 # ---------------------------------------------------------------------------
@@ -198,25 +181,13 @@ async def embed(
 
 
 @app.post("/transcribe")
-async def transcribe(
-    audio: UploadFile = File(...),
-    prompt: str = Form("Transcribe this audio."),
-):
+async def transcribe(audio: UploadFile = File(...)):
     try:
         raw = await audio.read()
         audio_16k = prepare_audio(raw)
 
-        model, processor = _load_voxtral()
-        inputs = processor(
-            audios=audio_16k,
-            sampling_rate=TARGET_SR,
-            text=prompt,
-            return_tensors="pt",
-        ).to("cuda")
-
-        output_ids = model.generate(**inputs, max_new_tokens=1024)
-        text = processor.batch_decode(output_ids, skip_special_tokens=True)[0]
-        text = _clean_voxtral_text(text)
+        model = _load_voxtral()
+        text = model.transcribe(audio_16k)
 
         return {"text": text}
     except Exception as e:
@@ -225,10 +196,7 @@ async def transcribe(
 
 
 @app.post("/transcribe/stream")
-async def transcribe_stream(
-    audio: UploadFile = File(...),
-    prompt: str = Form("Transcribe this audio."),
-):
+async def transcribe_stream(audio: UploadFile = File(...)):
     try:
         raw = await audio.read()
         audio_16k = prepare_audio(raw)
@@ -238,33 +206,25 @@ async def transcribe_stream(
 
     async def event_generator():
         try:
-            from transformers import TextIteratorStreamer
-
-            model, processor = _load_voxtral()
-            inputs = processor(
-                audios=audio_16k,
-                sampling_rate=TARGET_SR,
-                text=prompt,
-                return_tensors="pt",
-            ).to("cuda")
-
-            streamer = TextIteratorStreamer(
-                processor.tokenizer, skip_prompt=True, skip_special_tokens=True
-            )
-            gen_kwargs = {**inputs, "max_new_tokens": 1024, "streamer": streamer}
-
-            thread = threading.Thread(target=model.generate, kwargs=gen_kwargs)
-            thread.start()
-
+            model = _load_voxtral()
             full_text = ""
-            for chunk in streamer:
-                chunk = _MARKER_RE.sub("", chunk)
-                if chunk:
-                    full_text += chunk
-                    yield {"event": "token", "data": json.dumps({"token": chunk})}
 
+            # Run blocking generator in a thread
+            tokens = []
+
+            def _run():
+                for tok in model.transcribe_stream(audio_16k):
+                    tokens.append(tok)
+
+            thread = threading.Thread(target=_run)
+            thread.start()
             thread.join()
-            full_text = " ".join(full_text.split()).strip()
+
+            for tok in tokens:
+                full_text += tok
+                yield {"event": "token", "data": json.dumps({"token": tok})}
+
+            full_text = full_text.strip()
             yield {"event": "done", "data": json.dumps({"text": full_text})}
         except Exception as e:
             logger.exception("Streaming transcription failed")
