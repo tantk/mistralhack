@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from './store/appStore'
+import Layout from './components/Layout'
 import Upload from './components/Upload'
 import Processing from './components/Processing'
 import Results from './components/Results'
@@ -14,7 +15,7 @@ export default function App() {
   const stage = useStore((s) => s.stage)
 
   return (
-    <div className="app-root">
+    <Layout>
       <AnimatePresence mode="wait">
         {(stage === 'idle' || stage === 'uploading') && (
           <motion.div key="upload" {...PAGE_VARIANTS} transition={{ duration: 0.25 }}>
@@ -32,6 +33,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </Layout>
   )
 }

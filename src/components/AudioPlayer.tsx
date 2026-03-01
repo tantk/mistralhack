@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import { useStore } from '../store/appStore'
+import Icon from './ui/Icon'
 
 interface Props {
   onSeek?: (time: number) => void
@@ -19,7 +20,6 @@ export default function AudioPlayer({ onSeek, seekTo }: Props) {
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
 
-    // Reuse instance if already created
     if (wsRef.current) {
       wsRef.current.load(audioUrl)
       return
@@ -27,9 +27,9 @@ export default function AudioPlayer({ onSeek, seekTo }: Props) {
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
-      waveColor: '#3f3f46',
-      progressColor: '#f59e0b',
-      cursorColor: '#f59e0b',
+      waveColor: 'rgba(6,241,249,0.3)',
+      progressColor: '#06f1f9',
+      cursorColor: '#06f1f9',
       barWidth: 2,
       barGap: 1,
       height: 48,
@@ -60,7 +60,6 @@ export default function AudioPlayer({ onSeek, seekTo }: Props) {
     }
   }, [audioUrl])
 
-  // External seek (from timeline click)
   useEffect(() => {
     if (seekTo !== undefined && wsRef.current && duration > 0) {
       wsRef.current.seekTo(seekTo / duration)
@@ -76,27 +75,18 @@ export default function AudioPlayer({ onSeek, seekTo }: Props) {
   if (!audioUrl) return null
 
   return (
-    <div className="audio-player">
+    <div className="glass-panel rounded-none border-x-0 border-t-0 flex items-center gap-3 px-5 py-3">
       <button
-        className="play-btn"
+        className="w-9 h-9 rounded-full border border-neon-cyan/40 flex items-center justify-center text-neon-cyan hover:bg-neon-cyan/10 hover:shadow-glow-cyan transition-all flex-shrink-0 cursor-pointer"
         onClick={() => wsRef.current?.playPause()}
         aria-label={playing ? 'Pause' : 'Play'}
       >
-        {playing ? (
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <rect x="3" y="2" width="4" height="12" rx="1" />
-            <rect x="9" y="2" width="4" height="12" rx="1" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4 2l10 6-10 6V2z" />
-          </svg>
-        )}
+        <Icon name={playing ? 'pause' : 'play_arrow'} size={20} />
       </button>
-      <div className="waveform-wrap">
+      <div className="flex-1">
         <div ref={containerRef} />
       </div>
-      <span className="time-display">
+      <span className="font-code text-[11px] text-zinc-500 flex-shrink-0 whitespace-nowrap">
         {fmt(currentTime)} / {fmt(duration)}
       </span>
     </div>
