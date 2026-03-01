@@ -8,7 +8,7 @@ COPY src/ src/
 RUN npm run build
 
 # Stage 2: Build backend
-FROM rust:1.83-bookworm AS backend
+FROM rust:1.85-bookworm AS backend
 RUN apt-get update && apt-get install -y clang libclang-dev cmake pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY orchestrator/ orchestrator/

@@ -9,6 +9,8 @@ use zvec_bindings::{
     VectorQuery, VectorSchema,
 };
 
+use super::hf_backup;
+
 const EMBEDDING_DIM: u32 = 192;
 
 /// A single voiceprint match from similarity search.
@@ -39,6 +41,8 @@ pub struct VoiceprintStore {
     collection: SharedCollection,
     sidecar_path: PathBuf,
     sidecar: std::sync::RwLock<Vec<SpeakerEntry>>,
+    store_path: String,
+    backup_sem: Arc<tokio::sync::Semaphore>,
 }
 
 impl VoiceprintStore {
@@ -89,6 +93,8 @@ impl VoiceprintStore {
             collection,
             sidecar_path,
             sidecar: std::sync::RwLock::new(sidecar),
+            store_path: store_path.to_string(),
+            backup_sem: Arc::new(tokio::sync::Semaphore::new(1)),
         })
     }
 
@@ -119,6 +125,15 @@ impl VoiceprintStore {
         }
 
         tracing::info!(id = %speaker_id, name = %name, "Enrolled speaker");
+
+        // Spawn async backup (non-blocking, serialized by semaphore)
+        let sem = self.backup_sem.clone();
+        let path = self.store_path.clone();
+        tokio::spawn(async move {
+            let _permit = sem.acquire().await;
+            hf_backup::backup_to_hf(&path).await;
+        });
+
         Ok(speaker_id)
     }
 
