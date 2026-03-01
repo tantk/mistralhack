@@ -1,7 +1,7 @@
 # Stage 1: Install cargo-chef
 FROM rust:1.85-bookworm AS chef
 RUN cargo install cargo-chef
-RUN apt-get update && apt-get install -y clang libclang-dev cmake pkg-config && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y clang libclang-dev cmake pkg-config g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Stage 2: Prepare dependency recipe (changes only when Cargo.toml/lock change)
