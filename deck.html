@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeetingMind — Hackathon Deck</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           THEME — Matches MeetingMind's frontend palette
+           Cyan/magenta/dark navy cyberpunk
+           =========================================== */
+        :root {
+            --bg-deep: #050e10;
+            --bg-primary: #0a1a1b;
+            --bg-card: #0f2223;
+            --bg-elevated: #132d2e;
+
+            --cyan: #06f1f9;
+            --cyan-dim: rgba(6, 241, 249, 0.15);
+            --cyan-glow: rgba(6, 241, 249, 0.35);
+            --magenta: #ff003c;
+            --magenta-dim: rgba(255, 0, 60, 0.15);
+            --yellow: #ffd600;
+            --yellow-dim: rgba(255, 214, 0, 0.12);
+            --green: #48bb78;
+            --purple: #9f7aea;
+            --orange: #ed8936;
+
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'Fira Code', monospace;
+
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+            --dur: 0.7s;
+
+            --slide-pad: clamp(2rem, 5vw, 5rem);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-deep);
+            color: var(--text);
+            overflow-x: hidden;
+            line-height: 1.55;
+        }
+
+        /* ===========================================
+           SLIDE CONTAINER
+           =========================================== */
+        .slide {
+            min-height: 100vh;
+            padding: var(--slide-pad);
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ===========================================
+           PROGRESS BAR — top of viewport
+           =========================================== */
+        .progress-bar {
+            position: fixed;
+            top: 0; left: 0;
+            height: 3px;
+            background: var(--cyan);
+            box-shadow: 0 0 12px var(--cyan-glow);
+            z-index: 100;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        /* ===========================================
+           NAV DOTS — right side
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: 1.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 90;
+        }
+        .nav-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            border: 1.5px solid var(--text-dim);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .nav-dot.active {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan-glow);
+            transform: scale(1.3);
+        }
+
+        /* ===========================================
+           KEYBOARD HINT
+           =========================================== */
+        .kbd-hint {
+            position: fixed;
+            bottom: 1.2rem; right: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            z-index: 90;
+            opacity: 0.6;
+        }
+        .kbd-hint kbd {
+            background: var(--bg-card);
+            border: 1px solid var(--text-dim);
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 0.65rem;
+        }
+
+        /* ===========================================
+           SLIDE COUNTER
+           =========================================== */
+        .slide-counter {
+            position: fixed;
+            bottom: 1.2rem; left: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            z-index: 90;
+        }
+        .slide-counter .current {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        /* ===========================================
+           ANIMATION — reveal on scroll
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity var(--dur) var(--ease),
+                        transform var(--dur) var(--ease);
+        }
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-40px);
+            transition: opacity var(--dur) var(--ease),
+                        transform var(--dur) var(--ease);
+        }
+        .reveal-right {
+            opacity: 0;
+            transform: translateX(40px);
+            transition: opacity var(--dur) var(--ease),
+                        transform var(--dur) var(--ease);
+        }
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.92);
+            transition: opacity var(--dur) var(--ease),
+                        transform var(--dur) var(--ease);
+        }
+        .slide.visible .reveal,
+        .slide.visible .reveal-left,
+        .slide.visible .reveal-right,
+        .slide.visible .reveal-scale {
+            opacity: 1;
+            transform: none;
+        }
+        .slide.visible .reveal:nth-child(1), .slide.visible .reveal-left:nth-child(1) { transition-delay: 0.05s; }
+        .slide.visible .reveal:nth-child(2), .slide.visible .reveal-left:nth-child(2) { transition-delay: 0.12s; }
+        .slide.visible .reveal:nth-child(3), .slide.visible .reveal-right:nth-child(3) { transition-delay: 0.19s; }
+        .slide.visible .reveal:nth-child(4), .slide.visible .reveal-right:nth-child(4) { transition-delay: 0.26s; }
+        .slide.visible .reveal:nth-child(5) { transition-delay: 0.33s; }
+        .slide.visible .reveal:nth-child(6) { transition-delay: 0.40s; }
+        .slide.visible .reveal:nth-child(7) { transition-delay: 0.47s; }
+        .slide.visible .reveal:nth-child(8) { transition-delay: 0.54s; }
+
+        /* ===========================================
+           TYPOGRAPHY
+           =========================================== */
+        h1 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        h2 {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+            letter-spacing: -0.01em;
+        }
+        h3 {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .label {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--cyan);
+        }
+
+        .accent { color: var(--cyan); }
+        .magenta { color: var(--magenta); }
+        .yellow { color: var(--yellow); }
+        .green { color: var(--green); }
+        .purple { color: var(--purple); }
+        .orange { color: var(--orange); }
+        .muted { color: var(--text-muted); }
+        .dim { color: var(--text-dim); }
+
+        /* ===========================================
+           GLASS CARD
+           =========================================== */
+        .glass {
+            background: var(--bg-card);
+            border: 1px solid rgba(6, 241, 249, 0.08);
+            border-radius: 12px;
+            padding: 1.4rem;
+            position: relative;
+        }
+        .glass::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(6,241,249,0.12), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .glass-cyan { border-left: 3px solid var(--cyan); }
+        .glass-magenta { border-left: 3px solid var(--magenta); }
+        .glass-yellow { border-left: 3px solid var(--yellow); }
+        .glass-green { border-left: 3px solid var(--green); }
+        .glass-purple { border-left: 3px solid var(--purple); }
+        .glass-orange { border-left: 3px solid var(--orange); }
+
+        /* ===========================================
+           LAYOUT HELPERS
+           =========================================== */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.8rem; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        .flex-col { display: flex; flex-direction: column; }
+        .gap-sm { gap: 0.6rem; }
+        .gap-md { gap: 1rem; }
+        .gap-lg { gap: 1.6rem; }
+        .mt-sm { margin-top: 0.6rem; }
+        .mt-md { margin-top: 1.2rem; }
+        .mt-lg { margin-top: 2rem; }
+        .mb-sm { margin-bottom: 0.6rem; }
+        .max-w { max-width: 900px; }
+
+        /* ===========================================
+           PIPELINE FLOW — horizontal phase arrows
+           =========================================== */
+        .pipeline {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            width: 100%;
+        }
+        .phase-box {
+            flex: 1;
+            padding: 1rem 0.8rem;
+            text-align: center;
+            position: relative;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+        }
+        .phase-box .phase-num {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+        }
+        .phase-box .phase-name {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .phase-box .phase-detail {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .phase-arrow {
+            display: flex;
+            align-items: center;
+            padding: 0 0.3rem;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+        }
+
+        /* ===========================================
+           CODE BLOCK
+           =========================================== */
+        .code-block {
+            background: var(--bg-deep);
+            border: 1px solid rgba(6,241,249,0.08);
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.7;
+            overflow-x: auto;
+            color: var(--text-muted);
+        }
+        .code-block .kw { color: var(--cyan); }
+        .code-block .fn { color: var(--yellow); }
+        .code-block .str { color: var(--green); }
+        .code-block .comment { color: var(--text-dim); font-style: italic; }
+        .code-block .type { color: var(--purple); }
+
+        /* ===========================================
+           TOOL BADGE — for agent tools
+           =========================================== */
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--bg-elevated);
+            border: 1px solid rgba(6,241,249,0.12);
+            border-radius: 6px;
+            padding: 0.35rem 0.7rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--cyan);
+        }
+        .tool-badge .tool-icon {
+            width: 14px; height: 14px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        /* ===========================================
+           STAT BLOCK
+           =========================================== */
+        .stat {
+            text-align: center;
+        }
+        .stat .stat-value {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(2rem, 4vw, 3rem);
+            color: var(--cyan);
+            line-height: 1.1;
+        }
+        .stat .stat-label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+        }
+
+        /* ===========================================
+           ANIMATED GRADIENT MESH — for title bg
+           =========================================== */
+        .gradient-mesh {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 15% 85%, rgba(6,241,249,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 15%, rgba(255,0,60,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(159,122,234,0.04) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Grid pattern overlay */
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(6,241,249,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6,241,249,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* ===========================================
+           MISTRAL BADGE
+           =========================================== */
+        .mistral-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, rgba(255,122,0,0.15), rgba(255,60,0,0.08));
+            border: 1px solid rgba(255,122,0,0.25);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--orange);
+        }
+
+        /* ===========================================
+           FLOW CONNECTOR
+           =========================================== */
+        .flow-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .flow-arrow {
+            color: var(--text-dim);
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .flow-node {
+            background: var(--bg-elevated);
+            border: 1px solid rgba(6,241,249,0.1);
+            border-radius: 6px;
+            padding: 0.4rem 0.8rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        /* ===========================================
+           DIVIDER
+           =========================================== */
+        .divider {
+            width: 60px;
+            height: 3px;
+            background: var(--cyan);
+            border-radius: 2px;
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        /* ===========================================
+           LIST STYLES
+           =========================================== */
+        ul.clean {
+            list-style: none;
+            padding: 0;
+        }
+        ul.clean li {
+            position: relative;
+            padding-left: 1.2rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        ul.clean li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.55em;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--cyan);
+        }
+
+        /* ===========================================
+           CONFIDENCE BAR
+           =========================================== */
+        .conf-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--bg-deep);
+            overflow: hidden;
+            margin-top: 0.3rem;
+        }
+        .conf-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 1s var(--ease);
+        }
+
+        /* ===========================================
+           RESPONSIVE
+           =========================================== */
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
+            .pipeline { flex-direction: column; gap: 0.5rem; }
+            .phase-arrow { transform: rotate(90deg); justify-content: center; }
+            .nav-dots, .kbd-hint { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal, .reveal-left, .reveal-right, .reveal-scale {
+                transition: opacity 0.3s ease;
+                transform: none;
+            }
+        }
+
+        /* ===========================================
+           SLIDE-SPECIFIC LAYOUTS
+           =========================================== */
+        .title-slide {
+            align-items: center;
+            text-align: center;
+        }
+
+        .title-mega {
+            font-size: clamp(3rem, 8vw, 6rem);
+            line-height: 1;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--cyan), #a0f0ff, var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .title-sub {
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            color: var(--text-muted);
+            font-weight: 300;
+            max-width: 700px;
+            margin-top: 0.8rem;
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 0.6rem;
+        }
+
+        /* Fallback cascade visual */
+        .fallback-chain {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .fallback-level {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+        }
+        .fallback-level .level-tag {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        /* Demo slide pulsing border */
+        .demo-border {
+            border: 2px solid var(--cyan);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            position: relative;
+            animation: pulse-border 2s ease-in-out infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 20px rgba(6,241,249,0.1); }
+            50% { box-shadow: 0 0 40px rgba(6,241,249,0.25); }
+        }
+
+        /* Agent loop diagram */
+        .agent-loop {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+        }
+        .agent-loop-left { flex: 1; }
+        .agent-loop-right { flex: 1; }
+
+        /* Horizontal rule */
+        .hr-subtle {
+            border: none;
+            border-top: 1px solid rgba(6,241,249,0.06);
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fixed UI elements -->
+    <div class="progress-bar" id="progressBar"></div>
+    <nav class="nav-dots" id="navDots"></nav>
+    <div class="slide-counter"><span class="current" id="slideNum">1</span> / <span id="slideTotal">14</span></div>
+    <div class="kbd-hint"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>Space</kbd></div>
+
+    <!-- =============================================
+         SLIDE 1 — TITLE
+         ============================================= -->
+    <section class="slide title-slide" data-title="Title">
+        <div class="gradient-mesh"></div>
+        <div class="grid-pattern"></div>
+
+        <p class="reveal section-label" style="margin-bottom:0.2rem;">Mistral AI Track</p>
+        <h1 class="reveal title-mega">MeetingMind</h1>
+        <p class="reveal title-sub">
+            An agentic meeting intelligence system that turns raw audio into structured, speaker-attributed insights — powered by Mistral.
+        </p>
+        <div class="reveal mt-md" style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
+            <div class="mistral-badge">voxtral-mini-latest</div>
+            <div class="mistral-badge">mistral-large-latest</div>
+        </div>
+        <div class="reveal mt-md flex-center gap-sm" style="flex-wrap:wrap;">
+            <span class="flow-node" style="border-color:rgba(6,241,249,0.2);">Rust Orchestrator</span>
+            <span class="flow-arrow">&plus;</span>
+            <span class="flow-node" style="border-color:rgba(159,122,234,0.2);">GPU Service</span>
+            <span class="flow-arrow">&plus;</span>
+            <span class="flow-node" style="border-color:rgba(72,187,120,0.2);">React Frontend</span>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 2 — THE PROBLEM
+         ============================================= -->
+    <section class="slide" data-title="Problem">
+        <div class="gradient-mesh"></div>
+        <div class="max-w">
+            <p class="reveal section-label">The Problem</p>
+            <h2 class="reveal">Meetings generate decisions.<br>But nobody captures them reliably.</h2>
+            <div class="reveal divider mt-md mb-sm"></div>
+            <div class="reveal grid-3 mt-md">
+                <div class="glass glass-magenta">
+                    <h3 class="magenta mb-sm">Lost Context</h3>
+                    <p class="muted" style="font-size:0.85rem;">Who said what? When? Notes are biased, incomplete, and rarely attributable.</p>
+                </div>
+                <div class="glass glass-yellow">
+                    <h3 class="yellow mb-sm">No Accountability</h3>
+                    <p class="muted" style="font-size:0.85rem;">Action items vanish. Decisions are contested. There's no canonical record.</p>
+                </div>
+                <div class="glass glass-cyan">
+                    <h3 class="accent mb-sm">Manual Effort</h3>
+                    <p class="muted" style="font-size:0.85rem;">Existing tools transcribe, but don't attribute speakers or extract structure.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 3 — THE SOLUTION
+         ============================================= -->
+    <section class="slide" data-title="Solution">
+        <div class="gradient-mesh"></div>
+        <div class="max-w">
+            <p class="reveal section-label">The Solution</p>
+            <h2 class="reveal">One upload. Full meeting intelligence.</h2>
+            <div class="reveal divider mt-md mb-sm"></div>
+            <div class="reveal grid-2 mt-md">
+                <div class="flex-col gap-md">
+                    <div class="glass glass-cyan">
+                        <h3>Speaker-Attributed Transcript</h3>
+                        <p class="muted mt-sm" style="font-size:0.85rem;">Acoustic + semantic hybrid resolution identifies who said what — even across meetings via voiceprint memory.</p>
+                    </div>
+                    <div class="glass glass-green">
+                        <h3>Structured Outputs</h3>
+                        <p class="muted mt-sm" style="font-size:0.85rem;">Decisions, action items, ambiguities, and meeting dynamics — extracted and categorized automatically.</p>
+                    </div>
+                </div>
+                <div class="flex-col gap-md">
+                    <div class="glass glass-purple">
+                        <h3>Agentic Resolution</h3>
+                        <p class="muted mt-sm" style="font-size:0.85rem;">A Mistral-powered agent with 5 tools autonomously resolves speaker identities through multi-turn reasoning.</p>
+                    </div>
+                    <div class="glass glass-orange">
+                        <h3>Real-Time Visibility</h3>
+                        <p class="muted mt-sm" style="font-size:0.85rem;">SSE streaming shows every pipeline phase live — transcript tokens, tool calls, speaker matches, analysis progress.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 4 — ARCHITECTURE OVERVIEW
+         ============================================= -->
+    <section class="slide" data-title="Architecture">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">Architecture</p>
+        <h2 class="reveal">Multi-Service Pipeline</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal mt-lg" style="display:flex; gap:1.5rem; align-items:stretch; flex-wrap:wrap;">
+            <!-- Frontend -->
+            <div class="glass glass-green" style="flex:1; min-width:200px;">
+                <p class="label green" style="color:var(--green);">Frontend</p>
+                <h3 class="mt-sm">React + TypeScript</h3>
+                <ul class="clean mt-sm">
+                    <li>Drag-and-drop upload</li>
+                    <li>SSE + polling fallback</li>
+                    <li>Interactive timeline</li>
+                    <li>Ambiguity resolver</li>
+                </ul>
+                <p class="dim mt-sm" style="font-size:0.72rem;">Zustand / Framer Motion / WaveSurfer</p>
+            </div>
+
+            <!-- Orchestrator -->
+            <div class="glass glass-orange" style="flex:1.3; min-width:220px;">
+                <p class="label orange" style="color:var(--orange);">Orchestrator</p>
+                <h3 class="mt-sm">Rust + Axum</h3>
+                <ul class="clean mt-sm">
+                    <li>5-phase pipeline engine</li>
+                    <li>Temporal alignment with drift correction</li>
+                    <li>Agent tool loop orchestration</li>
+                    <li>Graceful degradation cascade</li>
+                </ul>
+                <p class="dim mt-sm" style="font-size:0.72rem;">Tokio broadcast channels / SSE adapter</p>
+            </div>
+
+            <!-- AI Services -->
+            <div class="glass glass-purple" style="flex:1.2; min-width:220px;">
+                <p class="label purple" style="color:var(--purple);">AI Services</p>
+                <h3 class="mt-sm">Mistral + GPU + zvec</h3>
+                <ul class="clean mt-sm">
+                    <li>Voxtral transcription (word timestamps)</li>
+                    <li>Mistral Large agent reasoning</li>
+                    <li>Pyannote diarization (GPU)</li>
+                    <li>Voiceprint memory (vector store)</li>
+                </ul>
+                <p class="dim mt-sm" style="font-size:0.72rem;">FunASR embeddings / cosine similarity</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 5 — 5-PHASE PIPELINE
+         ============================================= -->
+    <section class="slide" data-title="Pipeline">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">Pipeline</p>
+        <h2 class="reveal">5-Phase Processing Engine</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal pipeline mt-lg">
+            <div class="phase-box" style="background:rgba(237,137,54,0.12); border:1px solid rgba(237,137,54,0.2);">
+                <span class="phase-num">PHASE 1</span>
+                <span class="phase-name orange">Transcribe</span>
+                <span class="phase-detail">Voxtral word-level timestamps</span>
+                <span class="phase-detail dim">Chunked for &gt;30min audio</span>
+            </div>
+            <div class="phase-arrow">&rarr;</div>
+            <div class="phase-box" style="background:rgba(237,137,54,0.12); border:1px solid rgba(237,137,54,0.2);">
+                <span class="phase-num">PHASE 2</span>
+                <span class="phase-name orange">Diarize</span>
+                <span class="phase-detail">Pyannote GPU segmentation</span>
+                <span class="phase-detail dim">Mistral fallback</span>
+            </div>
+            <div class="phase-arrow">&rarr;</div>
+            <div class="phase-box" style="background:rgba(6,241,249,0.06); border:1px solid rgba(6,241,249,0.12);">
+                <span class="phase-num">PHASE 2.5</span>
+                <span class="phase-name accent">Align + Match</span>
+                <span class="phase-detail">Temporal drift correction</span>
+                <span class="phase-detail dim">Acoustic voiceprint lookup</span>
+            </div>
+            <div class="phase-arrow">&rarr;</div>
+            <div class="phase-box" style="background:rgba(159,122,234,0.1); border:1px solid rgba(159,122,234,0.2);">
+                <span class="phase-num">PHASE 3</span>
+                <span class="phase-name purple">Resolve</span>
+                <span class="phase-detail">Mistral agent + 5 tools</span>
+                <span class="phase-detail dim">Multi-turn autonomous loop</span>
+            </div>
+            <div class="phase-arrow">&rarr;</div>
+            <div class="phase-box" style="background:rgba(72,187,120,0.1); border:1px solid rgba(72,187,120,0.2);">
+                <span class="phase-num">PHASE 4</span>
+                <span class="phase-name green">Analyze</span>
+                <span class="phase-detail">Decisions, actions, dynamics</span>
+                <span class="phase-detail dim">JSON structured output</span>
+            </div>
+        </div>
+
+        <div class="reveal grid-3 mt-lg">
+            <div class="stat">
+                <div class="stat-value">13</div>
+                <div class="stat-label">SSE event types streamed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="color:var(--purple);">5</div>
+                <div class="stat-label">Agent tools available</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="color:var(--orange);">3</div>
+                <div class="stat-label">Fallback levels per phase</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 6 — AGENTIC CORE (the big differentiator)
+         ============================================= -->
+    <section class="slide" data-title="Agent">
+        <div class="gradient-mesh"></div>
+        <p class="reveal section-label">Agentic Architecture</p>
+        <h2 class="reveal">Mistral Agent with Autonomous Tool Use</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal agent-loop mt-lg">
+            <div class="agent-loop-left">
+                <p class="muted" style="font-size:0.88rem;">The speaker resolution agent runs a multi-turn loop with <span class="accent">mistral-large-latest</span> and <span class="accent">tool_choice: auto</span>. It reasons over both acoustic evidence (voiceprint similarity) and semantic cues (self-introductions, role references, attendee context).</p>
+
+                <div class="mt-md flex-col gap-sm">
+                    <div class="tool-badge"><span class="tool-icon" style="background:var(--cyan);"></span> resolve_speaker</div>
+                    <div class="tool-badge"><span class="tool-icon" style="background:var(--purple);"></span> request_reanalysis</div>
+                    <div class="tool-badge"><span class="tool-icon" style="background:var(--orange);"></span> merge_speakers</div>
+                    <div class="tool-badge"><span class="tool-icon" style="background:var(--yellow);"></span> flag_ambiguity</div>
+                    <div class="tool-badge"><span class="tool-icon" style="background:var(--green);"></span> extract_action_items</div>
+                </div>
+
+                <div class="glass mt-md" style="padding:0.8rem 1rem;">
+                    <p class="dim" style="font-size:0.75rem;">Evidence Thresholds</p>
+                    <div class="mt-sm">
+                        <div style="display:flex; justify-content:space-between; font-size:0.78rem;">
+                            <span class="muted">Acoustic &gt; 0.85</span>
+                            <span class="green">Strong match</span>
+                        </div>
+                        <div class="conf-bar"><div class="conf-fill" style="width:92%; background:var(--green);"></div></div>
+                    </div>
+                    <div class="mt-sm">
+                        <div style="display:flex; justify-content:space-between; font-size:0.78rem;">
+                            <span class="muted">0.70 &ndash; 0.85</span>
+                            <span class="yellow">Suggestive</span>
+                        </div>
+                        <div class="conf-bar"><div class="conf-fill" style="width:75%; background:var(--yellow);"></div></div>
+                    </div>
+                    <div class="mt-sm">
+                        <div style="display:flex; justify-content:space-between; font-size:0.78rem;">
+                            <span class="muted">&lt; 0.70</span>
+                            <span class="magenta">Unreliable</span>
+                        </div>
+                        <div class="conf-bar"><div class="conf-fill" style="width:40%; background:var(--magenta);"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="agent-loop-right">
+                <div class="glass" style="background:var(--bg-deep); padding:1rem;">
+                    <p class="label mb-sm">Agent Loop Flow</p>
+                    <div class="code-block" style="border:none; padding:0; background:transparent; font-size:0.72rem;">
+<span class="comment">// Up to 5 autonomous iterations</span>
+<span class="kw">for</span> iteration <span class="kw">in</span> 1..=5 {
+  <span class="comment">// Build context: segments, attendees,</span>
+  <span class="comment">// acoustic matches, unresolved labels</span>
+  <span class="kw">let</span> msg = <span class="fn">build_user_message</span>(&context);
+
+  <span class="comment">// Call Mistral with tool_choice: auto</span>
+  <span class="kw">let</span> resp = <span class="fn">mistral_chat</span>(
+    model: <span class="str">"mistral-large-latest"</span>,
+    tools: [<span class="type">5 function schemas</span>],
+    tool_choice: <span class="str">"auto"</span>
+  );
+
+  <span class="comment">// Execute tool calls, stream results</span>
+  <span class="kw">for</span> call <span class="kw">in</span> resp.tool_calls {
+    <span class="kw">let</span> result = <span class="fn">execute_tool</span>(call);
+    <span class="fn">broadcast</span>(<span class="str">"tool_call"</span>, call);
+    <span class="fn">broadcast</span>(<span class="str">"tool_result"</span>, result);
+  }
+
+  <span class="comment">// Agent decides when it's done</span>
+  <span class="kw">if</span> all_resolved { <span class="kw">break</span>; }
+}
+
+<span class="comment">// Threshold fallback for any remaining</span>
+<span class="fn">apply_fallback</span>(threshold: 0.85);
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 7 — MISTRAL API DEEP INTEGRATION
+         ============================================= -->
+    <section class="slide" data-title="Mistral API">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">Mistral API Integration</p>
+        <h2 class="reveal">Beyond Simple Prompting</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="glass glass-orange">
+                <div class="mistral-badge mb-sm">voxtral-mini-latest</div>
+                <h3 class="mt-sm">Audio Transcription</h3>
+                <ul class="clean mt-sm">
+                    <li>Word-level timestamp extraction</li>
+                    <li><code style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">response_format: verbose_json</code></li>
+                    <li>Smart chunking: 25-min windows with 30s overlap for long audio</li>
+                    <li>Built-in <code style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">diarize: true</code> as GPU fallback</li>
+                </ul>
+            </div>
+            <div class="glass glass-purple">
+                <div class="mistral-badge" style="background:linear-gradient(135deg, rgba(159,122,234,0.15), rgba(159,122,234,0.05)); border-color:rgba(159,122,234,0.3); color:var(--purple);">mistral-large-latest</div>
+                <h3 class="mt-sm">Agent Reasoning + Analysis</h3>
+                <ul class="clean mt-sm">
+                    <li>Function calling with <code style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">tool_choice: auto</code></li>
+                    <li>Multi-turn tool loop (up to 5 iterations)</li>
+                    <li>JSON mode: <code style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">response_format: json_object</code></li>
+                    <li>Structured extraction: decisions, actions, dynamics</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="reveal glass mt-md" style="padding:1rem 1.4rem;">
+            <p class="label mb-sm">Mistral Features Used</p>
+            <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                <span class="flow-node" style="border-color:rgba(237,137,54,0.3); color:var(--orange);">Audio API</span>
+                <span class="flow-node" style="border-color:rgba(159,122,234,0.3); color:var(--purple);">Function Calling</span>
+                <span class="flow-node" style="border-color:rgba(6,241,249,0.3); color:var(--cyan);">JSON Mode</span>
+                <span class="flow-node" style="border-color:rgba(72,187,120,0.3); color:var(--green);">Verbose Timestamps</span>
+                <span class="flow-node" style="border-color:rgba(255,214,0,0.3); color:var(--yellow);">Diarization</span>
+                <span class="flow-node" style="border-color:rgba(255,0,60,0.3); color:var(--magenta);">Tool Use Autonomy</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 8 — TEMPORAL ALIGNMENT + ACOUSTIC MATCHING
+         ============================================= -->
+    <section class="slide" data-title="Engineering">
+        <div class="gradient-mesh"></div>
+        <p class="reveal section-label">Engineering Depth</p>
+        <h2 class="reveal">Precision Alignment & Acoustic Matching</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="flex-col gap-md">
+                <div class="glass glass-cyan">
+                    <h3>Temporal Drift Correction</h3>
+                    <p class="muted mt-sm" style="font-size:0.85rem;">
+                        Transcription and diarization pipelines produce timestamps with systematic offset. The orchestrator tests <span class="accent">-150ms to +150ms</span> in 10ms steps, maximizes word-segment overlap, and applies correction if drift exceeds 20ms.
+                    </p>
+                </div>
+                <div class="glass glass-purple">
+                    <h3>Smart Segment Selection</h3>
+                    <p class="muted mt-sm" style="font-size:0.85rem;">
+                        For voiceprint extraction, selects the optimal ~5s non-overlapping segment per speaker. Falls back to concatenation of adjacent segments within 0.5s gap. Ensures clean embeddings without speaker interference.
+                    </p>
+                </div>
+            </div>
+            <div class="flex-col gap-md">
+                <div class="glass glass-orange">
+                    <h3>Acoustic-Semantic Fusion</h3>
+                    <p class="muted mt-sm" style="font-size:0.85rem;">
+                        Pre-computed voiceprint matches are injected as evidence into the agent's context. The agent fuses these with transcript-level cues: self-introductions, name mentions, role references, and attendee list proximity.
+                    </p>
+                </div>
+                <div class="glass glass-green">
+                    <h3>Orphan Recovery</h3>
+                    <p class="muted mt-sm" style="font-size:0.85rem;">
+                        Words that fall between diarization segments are recovered within a <span class="accent">&plusmn;300ms</span> window and assigned to the nearest speaker. Overlap regions are detected and flagged for the agent.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 9 — GRACEFUL DEGRADATION
+         ============================================= -->
+    <section class="slide" data-title="Resilience">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">Resilience</p>
+        <h2 class="reveal">Multi-Level Fallback Cascade</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <p class="reveal muted mt-md max-w" style="font-size:0.9rem;">Every phase is designed to degrade gracefully. If the GPU service is unavailable, Mistral API picks up. If the agent fails to resolve speakers, threshold-based acoustic matching takes over. The pipeline never hard-fails.</p>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="glass">
+                <p class="label mb-sm">Transcription</p>
+                <div class="fallback-chain">
+                    <div class="fallback-level" style="background:rgba(72,187,120,0.08);">
+                        <span class="level-tag" style="background:rgba(72,187,120,0.15); color:var(--green);">PRIMARY</span>
+                        <span class="muted" style="font-size:0.82rem;">GPU Voxtral (self-hosted)</span>
+                    </div>
+                    <div class="fallback-level" style="background:rgba(255,214,0,0.06);">
+                        <span class="level-tag" style="background:rgba(255,214,0,0.12); color:var(--yellow);">FALLBACK</span>
+                        <span class="muted" style="font-size:0.82rem;">Mistral Audio API</span>
+                    </div>
+                    <div class="fallback-level" style="background:rgba(255,0,60,0.05);">
+                        <span class="level-tag" style="background:rgba(255,0,60,0.1); color:var(--magenta);">LAST RESORT</span>
+                        <span class="muted" style="font-size:0.82rem;">CPU Voxtral (&lt;60s audio)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="glass">
+                <p class="label mb-sm">Speaker Resolution</p>
+                <div class="fallback-chain">
+                    <div class="fallback-level" style="background:rgba(72,187,120,0.08);">
+                        <span class="level-tag" style="background:rgba(72,187,120,0.15); color:var(--green);">PRIMARY</span>
+                        <span class="muted" style="font-size:0.82rem;">Mistral agent + tool loop</span>
+                    </div>
+                    <div class="fallback-level" style="background:rgba(255,214,0,0.06);">
+                        <span class="level-tag" style="background:rgba(255,214,0,0.12); color:var(--yellow);">FALLBACK</span>
+                        <span class="muted" style="font-size:0.82rem;">Threshold fallback (&ge;0.85 cosine)</span>
+                    </div>
+                    <div class="fallback-level" style="background:rgba(255,0,60,0.05);">
+                        <span class="level-tag" style="background:rgba(255,0,60,0.1); color:var(--magenta);">DEGRADED</span>
+                        <span class="muted" style="font-size:0.82rem;">Unresolved with candidates flagged</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="reveal glass mt-md" style="padding:0.8rem 1.2rem;">
+            <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
+                <div>
+                    <p class="dim" style="font-size:0.72rem;">GPU Health Monitor</p>
+                    <p class="muted" style="font-size:0.82rem;">Background check every 60s. Non-blocking cache returns stale result immediately, spawns refresh.</p>
+                </div>
+                <div>
+                    <p class="dim" style="font-size:0.72rem;">Resolution Tracking</p>
+                    <p class="muted" style="font-size:0.82rem;">Every resolved speaker carries its method: <code style="font-family:var(--font-mono); font-size:0.72rem; color:var(--cyan);">agent | acoustic | threshold_fallback</code></p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 10 — VOICEPRINT MEMORY
+         ============================================= -->
+    <section class="slide" data-title="Memory">
+        <div class="gradient-mesh"></div>
+        <p class="reveal section-label">Persistent Memory</p>
+        <h2 class="reveal">Cross-Meeting Speaker Re-Identification</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-2 mt-lg">
+            <div class="flex-col gap-md">
+                <p class="muted" style="font-size:0.9rem;">MeetingMind remembers voices across meetings. Enroll a speaker once, and the system recognizes them in every future upload through acoustic embedding similarity.</p>
+                <div class="glass glass-cyan">
+                    <p class="label mb-sm">Enrollment Flow</p>
+                    <div class="flow-row">
+                        <span class="flow-node">Audio</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node">GPU /embed</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node">192-d vector</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node" style="border-color:rgba(6,241,249,0.3);">zvec store</span>
+                    </div>
+                </div>
+                <div class="glass glass-purple">
+                    <p class="label mb-sm" style="color:var(--purple);">Identification Flow</p>
+                    <div class="flow-row">
+                        <span class="flow-node">Segment</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node">GPU /embed</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node">Top-3 cosine</span>
+                        <span class="flow-arrow">&rarr;</span>
+                        <span class="flow-node" style="border-color:rgba(159,122,234,0.3);">Agent evidence</span>
+                    </div>
+                </div>
+            </div>
+            <div class="glass" style="display:flex; flex-direction:column; justify-content:center;">
+                <div class="stat">
+                    <div class="stat-value">192</div>
+                    <div class="stat-label">Embedding dimensions (L2 normalized)</div>
+                </div>
+                <hr class="hr-subtle">
+                <div style="display:flex; gap:1rem; justify-content:center; margin-top:0.8rem;">
+                    <div class="stat">
+                        <div class="stat-value" style="font-size:1.5rem;">FunASR</div>
+                        <div class="stat-label">Embedding model</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" style="font-size:1.5rem; color:var(--purple);">Pyannote</div>
+                        <div class="stat-label">Diarization model</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 11 — REAL-TIME FRONTEND
+         ============================================= -->
+    <section class="slide" data-title="Frontend">
+        <div class="grid-pattern"></div>
+        <p class="reveal section-label">User Experience</p>
+        <h2 class="reveal">Real-Time Processing Visibility</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-3 mt-lg">
+            <div class="glass glass-cyan">
+                <h3>Live Transcript Stream</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Token-by-token streaming via SSE. Speaker labels parsed and color-coded as they arrive. Cursor animation shows active transcription.</p>
+            </div>
+            <div class="glass glass-purple">
+                <h3>Agent Activity Panel</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Watch the agent work in real-time: tool calls, speaker resolutions with confidence bars, acoustic match scores.</p>
+            </div>
+            <div class="glass glass-green">
+                <h3>Interactive Timeline</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Multi-track speaker lanes with click-to-seek. Decision markers and ambiguity indicators with pulsing glow animation.</p>
+            </div>
+        </div>
+        <div class="reveal grid-3 mt-md">
+            <div class="glass glass-yellow">
+                <h3>Decision Ledger</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Status-badged decisions: locked, open, contested. Tracks proposer, seconder, and dissenters.</p>
+            </div>
+            <div class="glass glass-magenta">
+                <h3>Ambiguity Resolver</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Interactive card flow for resolving detected ambiguities. Confidence-weighted candidates with one-click assignment.</p>
+            </div>
+            <div class="glass glass-orange">
+                <h3>Pipeline Sidebar</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Vertical phase indicator with animated connectors. Percentage progress and phase transitions in real-time.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 12 — DEMO SLIDE
+         ============================================= -->
+    <section class="slide flex-center" data-title="Demo">
+        <div class="gradient-mesh"></div>
+        <div class="grid-pattern"></div>
+        <div class="reveal demo-border" style="max-width:700px; width:100%;">
+            <p class="section-label mb-sm">Live Demo</p>
+            <h2 style="font-size:clamp(2rem, 5vw, 3rem);">Upload. Watch. Explore.</h2>
+            <p class="muted mt-md" style="font-size:1rem; max-width:500px; margin-inline:auto;">
+                Real meeting audio processed end-to-end. Watch the transcript stream, agent reason, and structured insights emerge.
+            </p>
+            <div class="mt-lg" style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+                <span class="flow-node" style="font-size:0.85rem; padding:0.5rem 1rem;">1. Upload audio</span>
+                <span class="flow-arrow">&rarr;</span>
+                <span class="flow-node" style="font-size:0.85rem; padding:0.5rem 1rem;">2. Watch pipeline</span>
+                <span class="flow-arrow">&rarr;</span>
+                <span class="flow-node" style="font-size:0.85rem; padding:0.5rem 1rem;">3. Explore results</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 13 — WHY IT MATTERS (USEFULNESS)
+         ============================================= -->
+    <section class="slide" data-title="Impact">
+        <div class="gradient-mesh"></div>
+        <p class="reveal section-label">Impact</p>
+        <h2 class="reveal">Real Users. Real Value.</h2>
+        <div class="reveal divider mt-md"></div>
+
+        <div class="reveal grid-3 mt-lg">
+            <div class="glass glass-cyan">
+                <h3>Operations Teams</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Automatic meeting minutes with speaker attribution. No more "who said they'd do that?" Arguments settled by canonical record.</p>
+            </div>
+            <div class="glass glass-green">
+                <h3>Project Managers</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Action items extracted with owners and deadlines. Decision ledger with status tracking. Ambiguities surfaced before they become blockers.</p>
+            </div>
+            <div class="glass glass-purple">
+                <h3>Compliance & Audit</h3>
+                <p class="muted mt-sm" style="font-size:0.85rem;">Timestamped, speaker-attributed records. Meeting dynamics metrics (talk time %, interruptions). Full evidence chain for every resolution.</p>
+            </div>
+        </div>
+
+        <div class="reveal glass mt-lg" style="padding:1.2rem 1.6rem;">
+            <div class="grid-4">
+                <div class="stat">
+                    <div class="stat-value" style="font-size:1.8rem;">1</div>
+                    <div class="stat-label">Upload needed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="font-size:1.8rem; color:var(--purple);">5</div>
+                    <div class="stat-label">Automated phases</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="font-size:1.8rem; color:var(--green);">6</div>
+                    <div class="stat-label">Output categories</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="font-size:1.8rem; color:var(--orange);">0</div>
+                    <div class="stat-label">Manual steps</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =============================================
+         SLIDE 14 — CLOSING
+         ============================================= -->
+    <section class="slide title-slide" data-title="Close">
+        <div class="gradient-mesh"></div>
+        <div class="grid-pattern"></div>
+
+        <p class="reveal section-label">Built for Mistral AI Track</p>
+        <h1 class="reveal title-mega" style="font-size:clamp(2.5rem, 6vw, 4.5rem);">MeetingMind</h1>
+        <div class="reveal divider mt-md" style="margin-inline:auto;"></div>
+
+        <div class="reveal mt-lg grid-5" style="max-width:800px;">
+            <div class="stat">
+                <div class="stat-value" style="font-size:1.2rem;">Rust</div>
+                <div class="stat-label">Orchestrator</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="font-size:1.2rem; color:var(--purple);">Mistral</div>
+                <div class="stat-label">AI Engine</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="font-size:1.2rem; color:var(--green);">React</div>
+                <div class="stat-label">Frontend</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="font-size:1.2rem; color:var(--orange);">GPU</div>
+                <div class="stat-label">Diarization</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="font-size:1.2rem; color:var(--yellow);">zvec</div>
+                <div class="stat-label">Memory</div>
+            </div>
+        </div>
+
+        <p class="reveal muted mt-lg" style="font-size:1rem;">
+            Agentic meeting intelligence. Acoustic-semantic fusion. Structured insights.
+        </p>
+    </section>
+
+
+    <!-- =============================================
+         PRESENTATION CONTROLLER
+         ============================================= -->
+    <script>
+        /* ===========================================
+           SlidePresentation — handles navigation,
+           scroll-triggered animations, progress bar,
+           navigation dots, and keyboard/touch input
+           =========================================== */
+        class SlidePresentation {
+            constructor() {
+                this.slides = Array.from(document.querySelectorAll('.slide'));
+                this.total = this.slides.length;
+                this.currentIndex = 0;
+
+                document.getElementById('slideTotal').textContent = this.total;
+
+                this.buildNavDots();
+                this.setupObserver();
+                this.bindKeys();
+                this.bindTouch();
+                this.bindWheel();
+
+                // Initial check
+                this.updateVisibility();
+            }
+
+            /* Build navigation dots on right side */
+            buildNavDots() {
+                const nav = document.getElementById('navDots');
+                this.slides.forEach((_, i) => {
+                    const dot = document.createElement('div');
+                    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+                    dot.addEventListener('click', () => this.goTo(i));
+                    dot.title = this.slides[i].dataset.title || `Slide ${i + 1}`;
+                    nav.appendChild(dot);
+                });
+                this.dots = Array.from(nav.querySelectorAll('.nav-dot'));
+            }
+
+            /* Intersection Observer for scroll-triggered reveals */
+            setupObserver() {
+                const obs = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            const idx = this.slides.indexOf(entry.target);
+                            if (idx !== -1) this.setActive(idx);
+                        }
+                    });
+                }, { threshold: 0.4 });
+
+                this.slides.forEach(s => obs.observe(s));
+            }
+
+            /* Mark a slide as the current active */
+            setActive(idx) {
+                this.currentIndex = idx;
+
+                // Update dots
+                this.dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+
+                // Update counter
+                document.getElementById('slideNum').textContent = idx + 1;
+
+                // Update progress bar
+                const pct = ((idx + 1) / this.total) * 100;
+                document.getElementById('progressBar').style.width = pct + '%';
+            }
+
+            /* Scroll to a specific slide */
+            goTo(idx) {
+                if (idx < 0 || idx >= this.total) return;
+                this.slides[idx].scrollIntoView({ behavior: 'smooth' });
+            }
+
+            /* Navigate relative to current */
+            next() { this.goTo(this.currentIndex + 1); }
+            prev() { this.goTo(this.currentIndex - 1); }
+
+            /* Keyboard navigation */
+            bindKeys() {
+                document.addEventListener('keydown', (e) => {
+                    switch (e.key) {
+                        case 'ArrowRight':
+                        case 'ArrowDown':
+                        case ' ':
+                            e.preventDefault();
+                            this.next();
+                            break;
+                        case 'ArrowLeft':
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            this.prev();
+                            break;
+                        case 'Home':
+                            e.preventDefault();
+                            this.goTo(0);
+                            break;
+                        case 'End':
+                            e.preventDefault();
+                            this.goTo(this.total - 1);
+                            break;
+                    }
+                });
+            }
+
+            /* Touch/swipe support */
+            bindTouch() {
+                let startY = 0;
+                document.addEventListener('touchstart', (e) => {
+                    startY = e.touches[0].clientY;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    const diff = startY - e.changedTouches[0].clientY;
+                    if (Math.abs(diff) > 60) {
+                        if (diff > 0) this.next();
+                        else this.prev();
+                    }
+                }, { passive: true });
+            }
+
+            /* Mouse wheel with debounce */
+            bindWheel() {
+                let last = 0;
+                document.addEventListener('wheel', (e) => {
+                    const now = Date.now();
+                    if (now - last < 800) return;
+                    if (Math.abs(e.deltaY) > 30) {
+                        last = now;
+                        if (e.deltaY > 0) this.next();
+                        else this.prev();
+                    }
+                }, { passive: true });
+            }
+
+            /* Force-check visibility on load */
+            updateVisibility() {
+                const viewH = window.innerHeight;
+                this.slides.forEach((s, i) => {
+                    const rect = s.getBoundingClientRect();
+                    if (rect.top < viewH * 0.6 && rect.bottom > viewH * 0.4) {
+                        s.classList.add('visible');
+                        this.setActive(i);
+                    }
+                });
+            }
+        }
+
+        // Initialize
+        new SlidePresentation();
+    </script>
+</body>
+</html>

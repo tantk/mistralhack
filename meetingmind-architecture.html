@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,7 +17,9 @@
       --border: #e2e8f0;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -66,7 +69,10 @@
       color: #2d3748;
     }
 
-    p, li { color: var(--muted); }
+    p,
+    li {
+      color: var(--muted);
+    }
 
     .grid {
       display: grid;
@@ -162,20 +168,37 @@
       dominant-baseline: middle;
     }
 
-    .small { font-size: 0.88rem; color: #4a5568; }
+    .small {
+      font-size: 0.88rem;
+      color: #4a5568;
+    }
 
     @media (max-width: 960px) {
-      body { padding: 14px; }
-      h1 { padding: 20px; font-size: 1.55rem; }
-      .section { padding: 14px; }
-      svg { min-width: 820px; }
+      body {
+        padding: 14px;
+      }
+
+      h1 {
+        padding: 20px;
+        font-size: 1.55rem;
+      }
+
+      .section {
+        padding: 14px;
+      }
+
+      svg {
+        min-width: 820px;
+      }
     }
   </style>
 </head>
+
 <body>
   <h1>
     MeetingMind - Architecture Overview
-    <div class="subtitle">AI meeting intelligence pipeline with React frontend, Rust orchestrator, Mistral APIs, and GPU diarization/embedding service</div>
+    <div class="subtitle">AI meeting intelligence pipeline with React frontend, Rust orchestrator, Mistral APIs, and GPU
+      diarization/embedding service</div>
   </h1>
 
   <section class="section">
@@ -218,96 +241,153 @@
   <section class="section">
     <h2>2) Data Flow</h2>
     <div class="diagram-wrap">
-    <svg viewBox="0 0 1100 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="MeetingMind data flow diagram">
-      <defs>
-        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
-        </marker>
-      </defs>
+      <svg viewBox="0 0 1100 390" preserveAspectRatio="xMidYMid meet" role="img"
+        aria-label="MeetingMind data flow diagram">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#666" />
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6"
+            orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#48bb78" />
+          </marker>
+          <marker id="arrow-purple" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6"
+            orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#9f7aea" />
+          </marker>
+        </defs>
 
-      <rect x="40" y="130" width="170" height="90" rx="10" fill="#4299e1"/>
-      <text x="125" y="164" text-anchor="middle" fill="white" font-size="14" font-weight="700">Meeting Audio</text>
-      <text x="125" y="186" text-anchor="middle" fill="white" font-size="12">WAV/MP3/MP4/M4A</text>
+        <!-- Nodes -->
+        <!-- Audio -->
+        <rect x="25" y="145" width="140" height="90" rx="12" fill="#4299e1" />
+        <text x="95" y="180" text-anchor="middle" fill="white" font-size="14" font-weight="700">Meeting Audio</text>
+        <text x="95" y="202" text-anchor="middle" fill="white" font-size="12" opacity="0.9">WAV/MP3/MP4/M4A</text>
 
-      <rect x="275" y="130" width="210" height="90" rx="10" fill="#ed8936"/>
-      <text x="380" y="160" text-anchor="middle" fill="white" font-size="14" font-weight="700">Rust Orchestrator</text>
-      <text x="380" y="182" text-anchor="middle" fill="white" font-size="12">/api/jobs + SSE + /result</text>
-      <text x="380" y="202" text-anchor="middle" fill="white" font-size="12">state accumulation</text>
+        <!-- Orchestrator -->
+        <rect x="205" y="130" width="240" height="120" rx="12" fill="#ed8936" />
+        <text x="325" y="160" text-anchor="middle" fill="white" font-size="15" font-weight="700">Rust
+          Orchestrator</text>
+        <text x="325" y="182" text-anchor="middle" fill="white" font-size="12" opacity="0.95">/api/jobs + SSE +
+          /result</text>
+        <text x="325" y="202" text-anchor="middle" fill="white" font-size="12" opacity="0.95">Temporal Alignment
+          Engine</text>
+        <text x="325" y="222" text-anchor="middle" fill="white" font-size="12" opacity="0.95">Agentic Tool Loop</text>
 
-      <rect x="550" y="60" width="180" height="75" rx="10" fill="#9f7aea"/>
-      <text x="640" y="90" text-anchor="middle" fill="white" font-size="13" font-weight="700">Mistral API</text>
-      <text x="640" y="112" text-anchor="middle" fill="white" font-size="12">transcribe + analysis</text>
+        <!-- Mistral API -->
+        <rect x="540" y="35" width="210" height="75" rx="12" fill="#9f7aea" />
+        <text x="645" y="65" text-anchor="middle" fill="white" font-size="14" font-weight="700">Mistral API /
+          Voxtral</text>
+        <text x="645" y="87" text-anchor="middle" fill="white" font-size="12" opacity="0.9">transcribe + agent
+          reasoning</text>
 
-      <rect x="550" y="200" width="180" height="75" rx="10" fill="#9f7aea"/>
-      <text x="640" y="230" text-anchor="middle" fill="white" font-size="13" font-weight="700">GPU Service</text>
-      <text x="640" y="252" text-anchor="middle" fill="white" font-size="12">/diarize + /embed</text>
+        <!-- GPU Service -->
+        <rect x="540" y="152.5" width="210" height="75" rx="12" fill="#9f7aea" />
+        <text x="645" y="182.5" text-anchor="middle" fill="white" font-size="14" font-weight="700">GPU Service</text>
+        <text x="645" y="204.5" text-anchor="middle" fill="white" font-size="12" opacity="0.9">/diarize + /embed</text>
 
-      <rect x="785" y="130" width="120" height="90" rx="10" fill="#9f7aea"/>
-      <text x="845" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="700">zvec</text>
-      <text x="845" y="190" text-anchor="middle" fill="white" font-size="12">voiceprints</text>
+        <!-- Vector DB -->
+        <rect x="540" y="270" width="210" height="75" rx="12" fill="#9f7aea" />
+        <text x="645" y="300" text-anchor="middle" fill="white" font-size="14" font-weight="700">Vector Service</text>
+        <text x="645" y="322" text-anchor="middle" fill="white" font-size="12" opacity="0.9">zvec / Qdrant
+          voiceprints</text>
 
-      <rect x="955" y="130" width="110" height="90" rx="10" fill="#48bb78"/>
-      <text x="1010" y="162" text-anchor="middle" fill="white" font-size="13" font-weight="700">Outputs</text>
-      <text x="1010" y="182" text-anchor="middle" fill="white" font-size="11">transcript</text>
-      <text x="1010" y="198" text-anchor="middle" fill="white" font-size="11">timeline</text>
-      <text x="1010" y="214" text-anchor="middle" fill="white" font-size="11">actions</text>
+        <!-- Outputs -->
+        <rect x="850" y="145" width="150" height="90" rx="12" fill="#48bb78" />
+        <text x="925" y="171" text-anchor="middle" fill="white" font-size="14" font-weight="700">Outputs</text>
+        <text x="925" y="191" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Transcript &amp;
+          Timeline</text>
+        <text x="925" y="209" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Actions &amp;
+          Ledger</text>
+        <text x="925" y="227" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Meeting Dynamics</text>
 
-      <path d="M210,175 L275,175" stroke="#666" stroke-width="2.2" marker-end="url(#arrow)"/>
-      <path d="M485,162 L550,106" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
-      <path d="M485,188 L550,236" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
-      <path d="M730,236 L785,175" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
-      <path d="M905,175 L955,175" stroke="#666" stroke-width="2.2" marker-end="url(#arrow)"/>
+        <!-- Edges -->
+        <!-- Audio -> Orchestrator -->
+        <path d="M165,190 L205,190" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow)" />
 
-      <path d="M485,175 L955,250" stroke="#a0aec0" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrow)"/>
-      <text x="735" y="272" fill="#718096" font-size="11">SSE updates + polling fallback for recovery</text>
-    </svg>
+        <!-- Orchestrator <-> Mistral -->
+        <path d="M445,160 C490,160 490,60 540,60" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow)" />
+        <path d="M540,85 C490,85 490,180 445,180" fill="none" stroke="#9f7aea" stroke-width="2" stroke-dasharray="5,4"
+          marker-end="url(#arrow-purple)" />
+        <text x="492" y="103" fill="#666" font-size="10.5" font-weight="600" text-anchor="middle">API calls</text>
+        <text x="492" y="133" fill="#9f7aea" font-size="10.5" font-weight="600" text-anchor="middle">tool calls</text>
+
+        <!-- Orchestrator <-> GPU -->
+        <path d="M445,190 L540,190" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow)" />
+        <path d="M540,210 L445,210" fill="none" stroke="#9f7aea" stroke-width="2" stroke-dasharray="5,4"
+          marker-end="url(#arrow-purple)" />
+
+        <!-- Orchestrator <-> Vector DB -->
+        <path d="M445,220 C490,220 490,295 540,295" fill="none" stroke="#666" stroke-width="2"
+          marker-end="url(#arrow)" />
+        <path d="M540,320 C490,320 490,240 445,240" fill="none" stroke="#9f7aea" stroke-width="2" stroke-dasharray="5,4"
+          marker-end="url(#arrow-purple)" />
+
+        <!-- Orchestrator -> Outputs (Routing Above everything) -->
+        <path d="M325,130 L325,20 Q325,10 335,10 L915,10 Q925,10 925,20 L925,145" fill="none" stroke="#48bb78"
+          stroke-width="2" marker-end="url(#arrow-green)" />
+        <text x="625" y="26" fill="#48bb78" font-size="11.5" font-weight="600" text-anchor="middle">Live Event Stream
+          (SSE) &amp; Polling Fallback</text>
+      </svg>
     </div>
 
     <div class="legend">
       <span><span class="dot" style="background:#4299e1"></span>Data source/input</span>
-      <span><span class="dot" style="background:#ed8936"></span>Core processing/orchestration</span>
-      <span><span class="dot" style="background:#9f7aea"></span>AI/ML services</span>
-      <span><span class="dot" style="background:#48bb78"></span>Result/output</span>
+      <span><span class="dot" style="background:#ed8936"></span>Core logic/Orchestrator</span>
+      <span><span class="dot" style="background:#9f7aea"></span>External ML &amp; Vector services</span>
+      <span><span class="dot" style="background:#48bb78"></span>Result/output views</span>
+      <span><span class="dot" style="background:transparent; border: 1px dashed #9f7aea;"></span>Callback/Feedback
+        Loop</span>
     </div>
   </section>
 
   <section class="section">
     <h2>3) Processing Pipeline</h2>
     <div class="diagram-wrap">
-    <svg viewBox="0 0 1100 220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="MeetingMind multi-stage processing pipeline">
-      <defs>
-        <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
-        </marker>
-      </defs>
+      <svg viewBox="0 0 1060 220" preserveAspectRatio="xMidYMid meet" role="img"
+        aria-label="MeetingMind multi-stage processing pipeline">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#666" />
+          </marker>
+        </defs>
 
-      <rect x="30" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
-      <text x="120" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">1. transcribing</text>
-      <text x="120" y="123" text-anchor="middle" fill="white" font-size="11">Mistral Voxtral</text>
+        <rect x="30" y="70" width="170" height="85" rx="12" fill="#ed8936" />
+        <text x="115" y="105" text-anchor="middle" fill="white" font-size="14" font-weight="700">1. Transcribing</text>
+        <text x="115" y="127" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Mistral / Voxtral
+          GPU</text>
 
-      <rect x="240" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
-      <text x="330" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">2. diarizing</text>
-      <text x="330" y="123" text-anchor="middle" fill="white" font-size="11">GPU or API fallback</text>
+        <rect x="240" y="70" width="170" height="85" rx="12" fill="#ed8936" />
+        <text x="325" y="105" text-anchor="middle" fill="white" font-size="14" font-weight="700">2. Diarizing</text>
+        <text x="325" y="127" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">GPU / Mistral
+          fallback</text>
 
-      <rect x="450" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
-      <text x="540" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">2.5 acoustic</text>
-      <text x="540" y="123" text-anchor="middle" fill="white" font-size="11">embedding + zvec</text>
+        <rect x="450" y="70" width="170" height="85" rx="12" fill="#ed8936" />
+        <text x="535" y="105" text-anchor="middle" fill="white" font-size="14" font-weight="700">3. Alignment</text>
+        <text x="535" y="127" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Temporal Word
+          Align</text>
+        <text x="535" y="145" text-anchor="middle" fill="white" font-size="10.5" opacity="0.85">Drift detection</text>
 
-      <rect x="660" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
-      <text x="750" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">3. resolving</text>
-      <text x="750" y="123" text-anchor="middle" fill="white" font-size="11">agentic speaker map</text>
+        <rect x="660" y="70" width="170" height="85" rx="12" fill="#9f7aea" />
+        <text x="745" y="105" text-anchor="middle" fill="white" font-size="14" font-weight="700">4. Resolving</text>
+        <text x="745" y="127" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Mistral Agent +
+          zvec</text>
+        <text x="745" y="145" text-anchor="middle" fill="white" font-size="10.5" opacity="0.85">Dynamic tool
+          loops</text>
 
-      <rect x="870" y="70" width="180" height="80" rx="10" fill="#48bb78"/>
-      <text x="960" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">4. analyzing</text>
-      <text x="960" y="123" text-anchor="middle" fill="white" font-size="11">decisions + actions</text>
+        <rect x="870" y="70" width="170" height="85" rx="12" fill="#48bb78" />
+        <text x="955" y="105" text-anchor="middle" fill="white" font-size="14" font-weight="700">5. Analyzing</text>
+        <text x="955" y="127" text-anchor="middle" fill="white" font-size="11.5" opacity="0.95">Actions &amp;
+          Decisions</text>
+        <text x="955" y="145" text-anchor="middle" fill="white" font-size="10.5" opacity="0.85">Structured JSON</text>
 
-      <path d="M210,110 L240,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
-      <path d="M420,110 L450,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
-      <path d="M630,110 L660,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
-      <path d="M840,110 L870,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
-    </svg>
+        <path d="M200,112.5 L240,112.5" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow2)" />
+        <path d="M410,112.5 L450,112.5" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow2)" />
+        <path d="M620,112.5 L660,112.5" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow2)" />
+        <path d="M830,112.5 L870,112.5" fill="none" stroke="#666" stroke-width="2" marker-end="url(#arrow2)" />
+      </svg>
     </div>
-    <p class="small">Each stage writes to the shared job result object. This enables both live SSE consumption and polling-based recovery from the same canonical state.</p>
+    <p class="small">Each stage writes to the shared job result object. This enables both live SSE consumption and
+      polling-based recovery from the same canonical state.</p>
   </section>
 
   <section class="section">
@@ -403,8 +483,10 @@
     </div>
 
     <div class="note">
-      Data-flow risk to monitor: if SSE disconnects, clients must hydrate partial state from `/result` continuously, not only on completion. This keeps transcript/segments/analysis synchronized during fallback operation.
+      Data-flow risk to monitor: if SSE disconnects, clients must hydrate partial state from `/result` continuously, not
+      only on completion. This keeps transcript/segments/analysis synchronized during fallback operation.
     </div>
   </section>
 </body>
+
 </html>
