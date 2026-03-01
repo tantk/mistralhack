@@ -7,14 +7,14 @@ tags:
   - voxtral
   - pyannote
   - funasr
-  - meetingmind
+  - mmaga
 library_name: custom
 pipeline_tag: automatic-speech-recognition
 ---
 
-# MeetingMind GPU Endpoint
+# Make Meeting Analyses Great Again GPU Endpoint
 
-GPU-accelerated speech-to-text, speaker diarization, and embedding extraction for the MeetingMind pipeline. Runs as an HF Inference Endpoint on a T4 GPU with scale-to-zero.
+GPU-accelerated speech-to-text, speaker diarization, and embedding extraction for the MMAGA pipeline. Runs as an HF Inference Endpoint on a T4 GPU with scale-to-zero.
 
 **Model weights**: [`mistral-hackaton-2026/voxtral_model`](https://huggingface.co/mistral-hackaton-2026/voxtral_model) — Voxtral Realtime 4B (BF16 safetensors, loaded from `/repository/voxtral-model/`)
 

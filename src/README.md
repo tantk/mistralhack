@@ -1,4 +1,4 @@
-# MeetingMind — Frontend
+# Make Meeting Analyses Great Again — Frontend
 
 ## Backend Compatibility Analysis
 

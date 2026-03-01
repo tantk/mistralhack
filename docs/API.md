@@ -1,4 +1,4 @@
-# MeetingMind API Reference
+# Make Meeting Analyses Great Again API Reference
 
 ## Architecture Overview
 

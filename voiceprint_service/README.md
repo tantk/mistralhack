@@ -1,5 +1,5 @@
 ---
-title: MeetingMind VectorDB
+title: Make Meeting Analyses Great Again VectorDB
 emoji: 🔍
 colorFrom: blue
 colorTo: blue

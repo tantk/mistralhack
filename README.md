@@ -1,14 +1,14 @@
 ---
-title: MeetingMind
+title: Make Meeting Analyses Great Again
 colorFrom: indigo
 colorTo: purple
 sdk: docker
 app_port: 7860
 ---
 
-# MeetingMind
+# MMAGA
 
-MeetingMind is an AI-powered meeting intelligence system that turns uploaded audio into:
+Make Meeting Analyses Great Again (MMAGA) is an AI-powered meeting intelligence system that turns uploaded audio into:
 - timestamped transcript,
 - speaker-attributed timeline,
 - decisions,
@@ -18,7 +18,7 @@ MeetingMind is an AI-powered meeting intelligence system that turns uploaded aud
 
 It is built as a multi-service stack with a Rust orchestrator, React frontend, and Python GPU service.
 
-Architecture diagram: [meetingmind-architecture.html](meetingmind-architecture.html)
+Architecture diagram: [mmaga-architecture.html](mmaga-architecture.html)
 
 ## Repository Overview
 
