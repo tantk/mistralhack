@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useStore } from '../store/appStore'
 import Icon from './ui/Icon'
 
@@ -38,6 +38,19 @@ function PhaseLabel({ step, status }: { step: typeof PIPELINE_STEPS[number]; sta
   )
 }
 
+function useElapsed(running: boolean) {
+  const [start] = useState(() => Date.now())
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [running])
+  const s = Math.floor((now - start) / 1000)
+  const m = Math.floor(s / 60)
+  return `${m}:${String(s % 60).padStart(2, '0')}`
+}
+
 function PipelineSidebar() {
   const phase = useStore((s) => s.phase)
   const displayPhase = normalizePhase(phase)
@@ -46,6 +59,12 @@ function PipelineSidebar() {
   const totalSteps = PIPELINE_STEPS.length
   const doneSteps = currentIndex >= 0 ? currentIndex : 0
   const progressPct = Math.round(((doneSteps + (currentIndex >= 0 ? 0.5 : 0)) / totalSteps) * 100)
+  const currentStepNum = Math.min(doneSteps + 1, totalSteps)
+  const currentStepLabel = displayPhase
+    ? PIPELINE_STEPS.find((s) => s.id === displayPhase)?.label ?? ''
+    : ''
+
+  const elapsed = useElapsed(currentIndex >= 0)
 
   return (
     <aside className="w-72 border-r border-accent/10 bg-bg-primary p-6 flex flex-col gap-8 flex-shrink-0">
@@ -64,17 +83,21 @@ function PipelineSidebar() {
                 {/* Connector line */}
                 {!isLast && (
                   <div
-                    className={`absolute left-[15px] top-[32px] bottom-0 w-[2px] ${status === 'done' ? 'bg-accent' : status === 'active' ? 'bg-accent/20' : 'bg-slate-800'
+                    className={`absolute left-[15px] top-[32px] bottom-0 w-[2px] ${status === 'done'
+                        ? 'bg-accent'
+                        : status === 'active'
+                          ? 'bg-accent/20 pipeline-shimmer'
+                          : 'bg-slate-800'
                       }`}
                   />
                 )}
                 {/* Circle icon */}
                 <div
                   className={`z-10 flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${status === 'done'
-                      ? 'bg-accent text-bg-primary'
-                      : status === 'active'
-                        ? 'bg-accent/20 text-accent ring-2 ring-accent'
-                        : 'bg-slate-800 text-slate-500'
+                    ? 'bg-accent text-bg-primary'
+                    : status === 'active'
+                      ? 'bg-accent/20 text-accent ring-2 ring-accent'
+                      : 'bg-slate-800 text-slate-500'
                     }`}
                 >
                   <Icon name={status === 'done' ? 'check' : step.icon} size={18} />
@@ -88,19 +111,24 @@ function PipelineSidebar() {
 
       {/* Progress indicator */}
       <div className="mt-auto p-4 rounded-xl bg-accent/5 border border-accent/10">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs font-medium text-slate-400">Total Progress</span>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-xs font-medium text-slate-300">
+            Step {currentStepNum} of {totalSteps}
+          </span>
           <span className="text-xs font-bold text-accent">{progressPct}%</span>
         </div>
-        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+        {currentStepLabel && (
+          <p className="text-[10px] text-slate-500 mb-2">{currentStepLabel}</p>
+        )}
+        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]">
           <div
-            className="bg-accent h-full rounded-full transition-all duration-700 ease-out"
+            className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-accent/80 to-accent shadow-[0_0_8px_rgba(6,241,249,0.45)]"
             style={{ width: `${progressPct}%` }}
           />
         </div>
         <p className="text-[10px] text-slate-500 mt-3 flex items-center gap-1">
-          <Icon name="memory" size={12} className="text-accent" />
-          GPU Load: — | Latency: —
+          <Icon name="schedule" size={12} className="text-accent" />
+          Elapsed: {elapsed}
         </p>
       </div>
     </aside>
