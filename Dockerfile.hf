@@ -5,7 +5,6 @@ USER 1000
 WORKDIR /home/app
 COPY orchestrator ./orchestrator
 COPY static/ ./static/
-RUN mkdir -p data/voiceprints
 ENV PORT=7860
 EXPOSE 7860
 CMD ["./orchestrator"]
