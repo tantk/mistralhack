@@ -19,6 +19,7 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attendeesStr, setAttendeesStr] = useState('')
+  const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const store = useStore()
   const pipelineError = useStore((s) => s.pipelineError)
@@ -55,7 +56,9 @@ export default function Upload() {
   }
 
   const process = async () => {
-    if (!file) return
+    if (!file || loading) return
+    console.log('[Upload] process() called, file:', file.name, file.size)
+    setLoading(true)
     setError(null)
     store.setPipelineError(null)
     store.setStage('uploading')
@@ -64,13 +67,18 @@ export default function Upload() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
+      console.log('[Upload] calling submitJob...')
       const jobId = await submitJob(file, attendees)
+      console.log('[Upload] job created:', jobId)
       store.setJobId(jobId)
       store.setStage('processing')
       store.setPhase('transcribing')
     } catch (e) {
+      console.error('[Upload] error:', e)
       store.setStage('idle')
       setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -169,10 +177,10 @@ export default function Upload() {
         <Button
           variant="primary"
           className="process-btn w-full py-3.5 text-sm"
-          disabled={!file}
+          disabled={!file || loading}
           onClick={process}
         >
-          PROCESS MEETING
+          {loading ? 'UPLOADING...' : 'PROCESS MEETING'}
         </Button>
 
         {file && (
