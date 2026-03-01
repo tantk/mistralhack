@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeetingMind Architecture</title>
+  <style>
+    :root {
+      --data: #4299e1;
+      --processing: #ed8936;
+      --ai: #9f7aea;
+      --success: #48bb78;
+      --text: #1a202c;
+      --muted: #4a5568;
+      --surface: #f7fafc;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      max-width: 1200px;
+      margin-inline: auto;
+      padding: 20px;
+      color: var(--text);
+      line-height: 1.45;
+      background: #ffffff;
+    }
+
+    h1 {
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 28px;
+      border-radius: 12px;
+      font-size: 2rem;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      margin: 10px 0 0 0;
+      opacity: 0.92;
+      font-size: 0.98rem;
+      font-weight: 500;
+    }
+
+    .section {
+      margin: 28px 0;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    h2 {
+      margin: 0 0 14px 0;
+      font-size: 1.2rem;
+      color: #2d3748;
+    }
+
+    h3 {
+      margin: 10px 0;
+      font-size: 1rem;
+      color: #2d3748;
+    }
+
+    p, li { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--ai);
+      border-radius: 8px;
+      padding: 12px;
+      background: white;
+    }
+
+    .kpis {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      margin-top: 10px;
+    }
+
+    .kpi {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .kpi .label {
+      display: block;
+      color: #718096;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .kpi .value {
+      color: #2d3748;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 0.84rem;
+      color: #4a5568;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .note {
+      margin-top: 12px;
+      padding: 10px;
+      background: #fff;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      color: #4a5568;
+    }
+
+    .diagram-wrap {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 10px;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-width: 900px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    svg text {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      text-rendering: geometricPrecision;
+      dominant-baseline: middle;
+    }
+
+    .small { font-size: 0.88rem; color: #4a5568; }
+
+    @media (max-width: 960px) {
+      body { padding: 14px; }
+      h1 { padding: 20px; font-size: 1.55rem; }
+      .section { padding: 14px; }
+      svg { min-width: 820px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    MeetingMind - Architecture Overview
+    <div class="subtitle">AI meeting intelligence pipeline with React frontend, Rust orchestrator, Mistral APIs, and GPU diarization/embedding service</div>
+  </h1>
+
+  <section class="section">
+    <h2>1) Business Context</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Objectives</h3>
+        <ul>
+          <li>Convert meeting audio into structured insights quickly.</li>
+          <li>Improve speaker attribution quality with acoustic matching.</li>
+          <li>Surface decisions, action items, and ambiguities for follow-up.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Primary Users</h3>
+        <ul>
+          <li>Operations and project teams running recurring meetings.</li>
+          <li>Facilitators who need reliable post-meeting minutes.</li>
+          <li>Analysts auditing speaker contributions and meeting dynamics.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Value Delivered</h3>
+        <ul>
+          <li>Single upload to end-to-end transcript and analysis.</li>
+          <li>Real-time progress updates through SSE with polling resilience.</li>
+          <li>Local voiceprint retrieval without external vector DB.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><span class="label">Core Pipeline Phases</span><span class="value">5</span></div>
+      <div class="kpi"><span class="label">Primary API Surface</span><span class="value">Rust /api</span></div>
+      <div class="kpi"><span class="label">Streaming Mode</span><span class="value">SSE + polling</span></div>
+      <div class="kpi"><span class="label">Voiceprint Store</span><span class="value">zvec local</span></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2) Data Flow</h2>
+    <div class="diagram-wrap">
+    <svg viewBox="0 0 1100 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="MeetingMind data flow diagram">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+        </marker>
+      </defs>
+
+      <rect x="40" y="130" width="170" height="90" rx="10" fill="#4299e1"/>
+      <text x="125" y="164" text-anchor="middle" fill="white" font-size="14" font-weight="700">Meeting Audio</text>
+      <text x="125" y="186" text-anchor="middle" fill="white" font-size="12">WAV/MP3/MP4/M4A</text>
+
+      <rect x="275" y="130" width="210" height="90" rx="10" fill="#ed8936"/>
+      <text x="380" y="160" text-anchor="middle" fill="white" font-size="14" font-weight="700">Rust Orchestrator</text>
+      <text x="380" y="182" text-anchor="middle" fill="white" font-size="12">/api/jobs + SSE + /result</text>
+      <text x="380" y="202" text-anchor="middle" fill="white" font-size="12">state accumulation</text>
+
+      <rect x="550" y="60" width="180" height="75" rx="10" fill="#9f7aea"/>
+      <text x="640" y="90" text-anchor="middle" fill="white" font-size="13" font-weight="700">Mistral API</text>
+      <text x="640" y="112" text-anchor="middle" fill="white" font-size="12">transcribe + analysis</text>
+
+      <rect x="550" y="200" width="180" height="75" rx="10" fill="#9f7aea"/>
+      <text x="640" y="230" text-anchor="middle" fill="white" font-size="13" font-weight="700">GPU Service</text>
+      <text x="640" y="252" text-anchor="middle" fill="white" font-size="12">/diarize + /embed</text>
+
+      <rect x="785" y="130" width="120" height="90" rx="10" fill="#9f7aea"/>
+      <text x="845" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="700">zvec</text>
+      <text x="845" y="190" text-anchor="middle" fill="white" font-size="12">voiceprints</text>
+
+      <rect x="955" y="130" width="110" height="90" rx="10" fill="#48bb78"/>
+      <text x="1010" y="162" text-anchor="middle" fill="white" font-size="13" font-weight="700">Outputs</text>
+      <text x="1010" y="182" text-anchor="middle" fill="white" font-size="11">transcript</text>
+      <text x="1010" y="198" text-anchor="middle" fill="white" font-size="11">timeline</text>
+      <text x="1010" y="214" text-anchor="middle" fill="white" font-size="11">actions</text>
+
+      <path d="M210,175 L275,175" stroke="#666" stroke-width="2.2" marker-end="url(#arrow)"/>
+      <path d="M485,162 L550,106" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+      <path d="M485,188 L550,236" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+      <path d="M730,236 L785,175" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+      <path d="M905,175 L955,175" stroke="#666" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+      <path d="M485,175 L955,250" stroke="#a0aec0" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrow)"/>
+      <text x="735" y="272" fill="#718096" font-size="11">SSE updates + polling fallback for recovery</text>
+    </svg>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot" style="background:#4299e1"></span>Data source/input</span>
+      <span><span class="dot" style="background:#ed8936"></span>Core processing/orchestration</span>
+      <span><span class="dot" style="background:#9f7aea"></span>AI/ML services</span>
+      <span><span class="dot" style="background:#48bb78"></span>Result/output</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>3) Processing Pipeline</h2>
+    <div class="diagram-wrap">
+    <svg viewBox="0 0 1100 220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="MeetingMind multi-stage processing pipeline">
+      <defs>
+        <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+        </marker>
+      </defs>
+
+      <rect x="30" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
+      <text x="120" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">1. transcribing</text>
+      <text x="120" y="123" text-anchor="middle" fill="white" font-size="11">Mistral Voxtral</text>
+
+      <rect x="240" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
+      <text x="330" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">2. diarizing</text>
+      <text x="330" y="123" text-anchor="middle" fill="white" font-size="11">GPU or API fallback</text>
+
+      <rect x="450" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
+      <text x="540" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">2.5 acoustic</text>
+      <text x="540" y="123" text-anchor="middle" fill="white" font-size="11">embedding + zvec</text>
+
+      <rect x="660" y="70" width="180" height="80" rx="10" fill="#ed8936"/>
+      <text x="750" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">3. resolving</text>
+      <text x="750" y="123" text-anchor="middle" fill="white" font-size="11">agentic speaker map</text>
+
+      <rect x="870" y="70" width="180" height="80" rx="10" fill="#48bb78"/>
+      <text x="960" y="103" text-anchor="middle" fill="white" font-size="13" font-weight="700">4. analyzing</text>
+      <text x="960" y="123" text-anchor="middle" fill="white" font-size="11">decisions + actions</text>
+
+      <path d="M210,110 L240,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
+      <path d="M420,110 L450,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
+      <path d="M630,110 L660,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
+      <path d="M840,110 L870,110" stroke="#666" stroke-width="2" marker-end="url(#arrow2)"/>
+    </svg>
+    </div>
+    <p class="small">Each stage writes to the shared job result object. This enables both live SSE consumption and polling-based recovery from the same canonical state.</p>
+  </section>
+
+  <section class="section">
+    <h2>4) System Architecture (Layered)</h2>
+    <div class="grid">
+      <div class="card" style="border-left-color:#4299e1;">
+        <h3>Data/Input Layer</h3>
+        <ul>
+          <li>Meeting audio upload from React frontend.</li>
+          <li>Optional attendees list supplied with job create call.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color:#ed8936;">
+        <h3>Processing Layer</h3>
+        <ul>
+          <li>Rust orchestrator runs phase-based pipeline.</li>
+          <li>Maintains per-job state (`status`, `phase`, partial outputs).</li>
+          <li>Streams events and exposes polling endpoint.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color:#9f7aea;">
+        <h3>AI/Service Layer</h3>
+        <ul>
+          <li>Mistral models for transcription and structured analysis.</li>
+          <li>GPU service for diarization and embeddings.</li>
+          <li>zvec local vector store for voiceprint identification.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color:#48bb78;">
+        <h3>Output Layer</h3>
+        <ul>
+          <li>Speaker timeline segments and transcript.</li>
+          <li>Decision ledger, ambiguities, and action items.</li>
+          <li>Meeting dynamics metrics for post-meeting review.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>5) Features</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Functional</h3>
+        <ul>
+          <li>Audio upload and async processing jobs.</li>
+          <li>Live status/events with SSE.</li>
+          <li>Polling fallback via `/api/jobs/{id}/result`.</li>
+          <li>Speaker enrollment and listing endpoints.</li>
+          <li>Structured analytics extraction.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Non-Functional</h3>
+        <ul>
+          <li>Transport resilience (SSE + polling fallback).</li>
+          <li>Graceful degraded mode when GPU unavailable.</li>
+          <li>Single API surface to simplify CORS and clients.</li>
+          <li>Stateless frontend and in-process backend job store.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>6) Deployment and Operations</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Deployment Model</h3>
+        <ul>
+          <li>Containerized orchestrator serves API + static frontend.</li>
+          <li>GPU service runs as separate Python service/endpoint.</li>
+          <li>Mistral API consumed externally with API key.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Prerequisites</h3>
+        <ul>
+          <li>`MISTRAL_API_KEY` configured in runtime environment.</li>
+          <li>`DIARIZATION_URL` points to reachable GPU service.</li>
+          <li>Optional `API_KEY` to gate all `/api` routes.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Operational Workflow</h3>
+        <ol>
+          <li>Deploy orchestrator and frontend bundle.</li>
+          <li>Provision/verify GPU service health endpoint.</li>
+          <li>Submit jobs, monitor SSE, validate `/result` recovery.</li>
+          <li>Review outputs in Timeline, Ledger, and Clarifications UI.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="note">
+      Data-flow risk to monitor: if SSE disconnects, clients must hydrate partial state from `/result` continuously, not only on completion. This keeps transcript/segments/analysis synchronized during fallback operation.
+    </div>
+  </section>
+</body>
+</html>

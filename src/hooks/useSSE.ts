@@ -59,6 +59,16 @@ export function useSSE(jobId: string | null) {
     setPhase(null)
   }
 
+  function applyPartialResult(data: any) {
+    if (typeof data.transcript === 'string') setTranscript(data.transcript)
+    if (Array.isArray(data.segments)) setSegments(data.segments)
+    if (Array.isArray(data.decisions)) setDecisions(data.decisions)
+    if (Array.isArray(data.ambiguities)) setAmbiguities(data.ambiguities)
+    if (Array.isArray(data.action_items)) setActionItems(data.action_items)
+    if (data.meeting_dynamics) setMeetingDynamics(data.meeting_dynamics)
+    if (typeof data.phase === 'string') setPhase(data.phase)
+  }
+
   function applyErrorResult(data: any) {
     const errorMessage = typeof data.error === 'string' && data.error.trim().length > 0
       ? data.error
@@ -80,7 +90,7 @@ export function useSSE(jobId: string | null) {
         const data = await res.json()
 
         if (data.status === 'processing') {
-          if (data.phase) setPhase(data.phase)
+          applyPartialResult(data)
           return
         }
 
@@ -111,6 +121,9 @@ export function useSSE(jobId: string | null) {
         return
       }
       const data = await res.json()
+      if (data.status === 'processing') {
+        applyPartialResult(data)
+      }
       if (data.status === 'complete') {
         applyCompleteResult(data)
         return
