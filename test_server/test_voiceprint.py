@@ -1,331 +1,228 @@
+#!/usr/bin/env python3
 """
-Test the GPU service voiceprint endpoints.
+Test voiceprint speaker identification using VoxCeleb mini dataset.
 
-Endpoints tested:
-  - POST /voiceprint/enroll   — enroll a speaker voiceprint
-  - POST /voiceprint/identify — identify a speaker from audio
-  - GET  /voiceprint/speakers — list enrolled speakers
+Flow:
+1. Extract embeddings from audio locally (transformers Wav2Vec2 or ECAPA-TDNN)
+2. Enroll first N clips per speaker into vectordb service (/enroll)
+3. Identify remaining clips (/identify) and check accuracy
 
-Uses audio samples from data/audio_samples/ or data/peoples_speech/.
-
-Results saved to test_server/voiceprint_results.json
+Usage:
+    python test_server/test_voiceprint.py [--vectordb-url URL]
 """
+
+import argparse
 import json
 import os
 import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import requests
+import torch
 
-GPU_SERVICE_URL = os.environ.get("DIARIZATION_URL", "http://192.168.0.105:8001")
-ORCHESTRATOR_URL = os.environ.get("SERVICE_URL", "http://localhost:8000")
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-AUDIO_DIR = os.path.join(PROJECT_ROOT, "data", "audio_samples")
-PEOPLES_SPEECH_DIR = os.path.join(PROJECT_ROOT, "data", "peoples_speech")
+DATA_DIR = Path(__file__).parent.parent / "data" / "voxceleb_mini"
+ENROLL_COUNT = 3  # clips per speaker used for enrollment
+RESULTS_FILE = Path(__file__).parent / "voiceprint_results.json"
 
+DEFAULT_VECTORDB_URL = "https://tantk-meetingmind-vectordb.hf.space"
 
-def find_audio_files(count=2):
-    """Find audio files for testing (need at least 2 for enroll + identify)."""
-    files = []
-    for d in [AUDIO_DIR, PEOPLES_SPEECH_DIR]:
-        if not os.path.isdir(d):
-            continue
-        for f in sorted(os.listdir(d)):
-            if f.endswith((".wav", ".flac", ".mp3")):
-                files.append(os.path.join(d, f))
-                if len(files) >= count:
-                    return files
-    return files
+# Embedding model (loaded once)
+_feature_extractor = None
+_embed_model = None
+EMBED_MODEL_NAME = "microsoft/wavlm-base-sv"  # speaker verification model, 512-dim
 
 
-def test_health():
-    """Test GPU service health and check embedding backend."""
-    print("\n--- Test: GPU Service Health ---")
-    resp = requests.get(f"{GPU_SERVICE_URL}/health", timeout=10)
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"Health check failed: {resp.status_code}"
-
-    data = resp.json()
-    print(f"  GPU available: {data.get('gpu_available')}")
-    print(f"  Embedding backend: {data.get('embedding_backend')}")
-    return data
-
-
-def test_enroll(audio_path, name):
-    """Test POST /voiceprint/enroll — enroll a speaker."""
-    print(f"\n--- Test: Enroll Speaker '{name}' ---")
-    with open(audio_path, "rb") as f:
-        resp = requests.post(
-            f"{GPU_SERVICE_URL}/voiceprint/enroll",
-            files={"audio": f},
-            data={"name": name},
-            timeout=60,
-        )
-
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"Enroll failed: {resp.status_code} {resp.text}"
-
-    data = resp.json()
-    assert "speaker_id" in data, f"Missing speaker_id: {data}"
-    assert "name" in data, f"Missing name: {data}"
-    assert data["name"] == name, f"Name mismatch: {data['name']} != {name}"
-
-    print(f"  Speaker ID: {data['speaker_id']}")
-    print(f"  Name: {data['name']}")
-    return data
+def _load_embed_model():
+    global _feature_extractor, _embed_model
+    if _embed_model is None:
+        from transformers import AutoFeatureExtractor, AutoModel
+        print(f"  Loading embedding model: {EMBED_MODEL_NAME}...")
+        _feature_extractor = AutoFeatureExtractor.from_pretrained(EMBED_MODEL_NAME)
+        _embed_model = AutoModel.from_pretrained(EMBED_MODEL_NAME)
+        _embed_model.eval()
+        print(f"  Model loaded.")
+    return _feature_extractor, _embed_model
 
 
-def test_list_speakers():
-    """Test GET /voiceprint/speakers — list enrolled speakers."""
-    print("\n--- Test: List Speakers ---")
-    resp = requests.get(f"{GPU_SERVICE_URL}/voiceprint/speakers", timeout=10)
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"List failed: {resp.status_code}"
-
-    data = resp.json()
-    assert "speakers" in data, f"Missing speakers: {data}"
-
-    speakers = data["speakers"]
-    print(f"  Enrolled speakers: {len(speakers)}")
-    for s in speakers:
-        print(f"    - {s}")
-    return data
-
-
-def test_identify(audio_path, start_time=None, end_time=None):
-    """Test POST /voiceprint/identify — identify a speaker from audio."""
-    print("\n--- Test: Identify Speaker ---")
-    form_data = {}
-    if start_time is not None:
-        form_data["start_time"] = str(start_time)
-    if end_time is not None:
-        form_data["end_time"] = str(end_time)
-
-    with open(audio_path, "rb") as f:
-        resp = requests.post(
-            f"{GPU_SERVICE_URL}/voiceprint/identify",
-            files={"audio": f},
-            data=form_data,
-            timeout=60,
-        )
-
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"Identify failed: {resp.status_code} {resp.text}"
-
-    data = resp.json()
-    assert "matches" in data, f"Missing matches: {data}"
-
-    matches = data["matches"]
-    print(f"  Matches: {len(matches)}")
-    for m in matches:
-        print(f"    - {m.get('name', '?')}: similarity={m.get('similarity', 0):.3f}")
-    return data
+def get_embedding_local(audio_path: str) -> list[float]:
+    """Extract speaker embedding from audio file using local model."""
+    import librosa
+    audio, sr = librosa.load(audio_path, sr=16000, mono=True)
+    feature_extractor, model = _load_embed_model()
+    inputs = feature_extractor(audio, sampling_rate=16000, return_tensors="pt", padding=True)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    # Mean pool over time dimension → single embedding vector
+    emb = outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+    # L2 normalize
+    norm = np.linalg.norm(emb)
+    if norm > 0:
+        emb = emb / norm
+    return emb.tolist()
 
 
-def test_identify_with_time_range(audio_path):
-    """Test identify with start_time and end_time slicing."""
-    print("\n--- Test: Identify with Time Range ---")
-    with open(audio_path, "rb") as f:
-        resp = requests.post(
-            f"{GPU_SERVICE_URL}/voiceprint/identify",
-            files={"audio": f},
-            data={"start_time": "0.0", "end_time": "5.0"},
-            timeout=60,
-        )
-
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"Identify (sliced) failed: {resp.status_code} {resp.text}"
-
-    data = resp.json()
-    assert "matches" in data, f"Missing matches: {data}"
-    print(f"  Matches (0-5s slice): {len(data['matches'])}")
-    for m in data["matches"]:
-        print(f"    - {m.get('name', '?')}: similarity={m.get('similarity', 0):.3f}")
-    return data
+def enroll_speaker(vectordb_url: str, name: str, embedding: list[float]) -> str:
+    """Enroll a speaker embedding in the vectordb service."""
+    resp = requests.post(
+        f"{vectordb_url}/enroll",
+        json={"name": name, "embedding": embedding},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["speaker_id"]
 
 
-def test_identify_no_enrollments(audio_path):
-    """Test identify when no speakers are enrolled — should return empty matches."""
-    print("\n--- Test: Identify with No Enrollments ---")
-    with open(audio_path, "rb") as f:
-        resp = requests.post(
-            f"{GPU_SERVICE_URL}/voiceprint/identify",
-            files={"audio": f},
-            timeout=60,
-        )
-
-    print(f"  Status: {resp.status_code}")
-    # Should still return 200 with empty matches, not an error
-    if resp.status_code == 200:
-        data = resp.json()
-        print(f"  Matches: {len(data.get('matches', []))}")
-        return data
-    else:
-        print(f"  Response: {resp.text[:200]}")
-        return None
-
-
-def test_orchestrator_enroll(audio_path, name):
-    """Test POST /api/speakers/enroll on the Rust orchestrator."""
-    print(f"\n--- Test: Orchestrator Enroll '{name}' ---")
-    with open(audio_path, "rb") as f:
-        resp = requests.post(
-            f"{ORCHESTRATOR_URL}/api/speakers/enroll",
-            files={"audio": f},
-            data={"name": name},
-            timeout=60,
-        )
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"Enroll failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    assert "speaker_id" in data, f"Missing speaker_id: {data}"
-    print(f"  Speaker ID: {data['speaker_id']}")
-    print(f"  Name: {data.get('name')}")
-    return data
-
-
-def test_orchestrator_list_speakers():
-    """Test GET /api/speakers on the Rust orchestrator."""
-    print("\n--- Test: Orchestrator List Speakers ---")
-    resp = requests.get(f"{ORCHESTRATOR_URL}/api/speakers", timeout=10)
-    print(f"  Status: {resp.status_code}")
-    assert resp.status_code == 200, f"List failed: {resp.status_code}"
-    data = resp.json()
-    speakers = data.get("speakers", [])
-    print(f"  Speakers: {len(speakers)}")
-    for s in speakers:
-        print(f"    - {s}")
-    return data
+def identify_speaker(vectordb_url: str, embedding: list[float], top_k: int = 3) -> list[dict]:
+    """Identify a speaker from embedding via vectordb service."""
+    resp = requests.post(
+        f"{vectordb_url}/identify",
+        json={"embedding": embedding, "top_k": top_k},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["matches"]
 
 
 def main():
-    print("=" * 70)
-    print("Voiceprint Endpoint Tests")
-    print("=" * 70)
-    print(f"GPU Service: {GPU_SERVICE_URL}")
+    parser = argparse.ArgumentParser(description="Test voiceprint speaker ID")
+    parser.add_argument("--vectordb-url", default=DEFAULT_VECTORDB_URL)
+    parser.add_argument("--enroll-count", type=int, default=ENROLL_COUNT)
+    args = parser.parse_args()
 
-    all_results = {
-        "service_url": GPU_SERVICE_URL,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "tests": {},
+    # Discover speakers
+    speakers = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir()])
+    if not speakers:
+        print(f"ERROR: No speaker directories in {DATA_DIR}")
+        sys.exit(1)
+    print(f"Found {len(speakers)} speakers: {speakers}")
+
+    # Pre-load embedding model
+    print("\nLoading embedding model...")
+    _load_embed_model()
+
+    # Check vectordb health
+    resp = requests.get(f"{args.vectordb_url}/health", timeout=10)
+    if resp.status_code != 200:
+        print(f"ERROR: VectorDB not healthy: {resp.text}")
+        sys.exit(1)
+    print(f"VectorDB healthy at {args.vectordb_url}")
+
+    results = {
+        "config": {
+            "embed_model": EMBED_MODEL_NAME,
+            "vectordb_url": args.vectordb_url,
+            "enroll_count": args.enroll_count,
+            "speakers": speakers,
+        },
+        "enrollments": [],
+        "identifications": [],
+        "summary": {},
     }
 
-    # 1. Health check
-    try:
-        health = test_health()
-        all_results["tests"]["health"] = "PASS"
-        all_results["health"] = health
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["health"] = f"FAIL: {e}"
-        print("\nGPU Service is not reachable. Cannot run voiceprint tests.")
-        save_results(all_results)
-        return
+    # Phase 1: Extract embeddings for all clips
+    print(f"\n{'='*60}")
+    print("Phase 1: Extracting embeddings from all clips")
+    print(f"{'='*60}")
 
-    # 2. Find audio files
-    audio_files = find_audio_files(2)
-    if len(audio_files) < 1:
-        print("\nERROR: No audio files found")
-        save_results(all_results)
-        return
-    print(f"\nAudio files: {[os.path.basename(f) for f in audio_files]}")
+    embeddings = {}  # speaker -> [(filename, embedding)]
+    for speaker in speakers:
+        speaker_dir = DATA_DIR / speaker
+        clips = sorted(speaker_dir.glob("*.wav"))
+        embeddings[speaker] = []
+        for clip in clips:
+            print(f"  {speaker}/{clip.name}...", end=" ", flush=True)
+            try:
+                emb = get_embedding_local(str(clip))
+                embeddings[speaker].append((clip.name, emb))
+                print(f"OK (dim={len(emb)})")
+            except Exception as e:
+                print(f"FAIL: {e}")
 
-    # 3. List speakers (before enrollment)
-    try:
-        before = test_list_speakers()
-        all_results["tests"]["list_speakers_initial"] = "PASS"
-        all_results["speakers_before"] = before
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["list_speakers_initial"] = f"FAIL: {e}"
+    # Phase 2: Enroll speakers (first N clips each)
+    print(f"\n{'='*60}")
+    print(f"Phase 2: Enrolling speakers ({args.enroll_count} clips each)")
+    print(f"{'='*60}")
 
-    # 4. Identify before enrollment (should work with empty results)
-    try:
-        result = test_identify_no_enrollments(audio_files[0])
-        all_results["tests"]["identify_no_enrollments"] = "PASS" if result else "WARN"
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["identify_no_enrollments"] = f"FAIL: {e}"
+    for speaker in speakers:
+        enroll_clips = embeddings[speaker][:args.enroll_count]
+        for fname, emb in enroll_clips:
+            print(f"  Enrolling {speaker} ({fname})...", end=" ", flush=True)
+            try:
+                sid = enroll_speaker(args.vectordb_url, speaker, emb)
+                results["enrollments"].append({
+                    "speaker": speaker,
+                    "file": fname,
+                    "speaker_id": sid,
+                })
+                print(f"OK (id={sid[:8]}...)")
+            except Exception as e:
+                print(f"FAIL: {e}")
 
-    # 5. Enroll speakers
-    enrolled_names = ["Test Speaker A", "Test Speaker B"]
-    for i, name in enumerate(enrolled_names):
-        if i >= len(audio_files):
-            break
-        try:
-            enroll_result = test_enroll(audio_files[i], name)
-            all_results["tests"][f"enroll_{name}"] = "PASS"
-        except Exception as e:
-            print(f"  FAIL: {e}")
-            all_results["tests"][f"enroll_{name}"] = f"FAIL: {e}"
+    # Phase 3: Identify remaining clips
+    print(f"\n{'='*60}")
+    print("Phase 3: Identifying remaining clips")
+    print(f"{'='*60}")
 
-    # 6. List speakers (after enrollment)
-    try:
-        after = test_list_speakers()
-        all_results["tests"]["list_speakers_after"] = "PASS"
-        all_results["speakers_after"] = after
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["list_speakers_after"] = f"FAIL: {e}"
+    correct = 0
+    total = 0
 
-    # 7. Identify (should now return matches)
-    try:
-        identify_result = test_identify(audio_files[0])
-        all_results["tests"]["identify_after_enroll"] = "PASS"
-        all_results["identify_result"] = identify_result
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["identify_after_enroll"] = f"FAIL: {e}"
+    for speaker in speakers:
+        test_clips = embeddings[speaker][args.enroll_count:]
+        if not test_clips:
+            print(f"  {speaker}: no test clips (all used for enrollment)")
+            continue
 
-    # 8. Identify with time range
-    try:
-        sliced_result = test_identify_with_time_range(audio_files[0])
-        all_results["tests"]["identify_time_range"] = "PASS"
-        all_results["identify_sliced_result"] = sliced_result
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["identify_time_range"] = f"FAIL: {e}"
+        for fname, emb in test_clips:
+            total += 1
+            print(f"  {speaker}/{fname}...", end=" ", flush=True)
+            try:
+                matches = identify_speaker(args.vectordb_url, emb, top_k=3)
+                top_match = matches[0] if matches else {"name": "none", "similarity": 0}
+                is_correct = top_match["name"] == speaker
+                if is_correct:
+                    correct += 1
+                    status = "CORRECT"
+                else:
+                    status = f"WRONG (got {top_match['name']})"
 
-    # 9. Test orchestrator proxy endpoints
-    print(f"\n{'=' * 70}")
-    print("Orchestrator Speaker Endpoints")
-    print(f"{'=' * 70}")
-
-    try:
-        result = test_orchestrator_list_speakers()
-        all_results["tests"]["orch_list_speakers"] = "PASS"
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["orch_list_speakers"] = f"FAIL: {e}"
-
-    try:
-        result = test_orchestrator_enroll(audio_files[0], "Orchestrator Test Speaker")
-        all_results["tests"]["orch_enroll"] = "PASS"
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["orch_enroll"] = f"FAIL: {e}"
-
-    try:
-        result = test_orchestrator_list_speakers()
-        all_results["tests"]["orch_list_after_enroll"] = "PASS"
-    except Exception as e:
-        print(f"  FAIL: {e}")
-        all_results["tests"]["orch_list_after_enroll"] = f"FAIL: {e}"
+                print(f"{status} (sim={top_match['similarity']:.3f})")
+                results["identifications"].append({
+                    "true_speaker": speaker,
+                    "file": fname,
+                    "predicted": top_match["name"],
+                    "similarity": top_match["similarity"],
+                    "correct": is_correct,
+                    "top_3": [{"name": m["name"], "similarity": m["similarity"]} for m in matches],
+                })
+            except Exception as e:
+                print(f"ERROR: {e}")
 
     # Summary
-    print(f"\n{'=' * 70}")
-    print("SUMMARY")
-    print(f"{'=' * 70}")
-    for test_name, status in all_results["tests"].items():
-        print(f"  {test_name:<35} {status}")
+    accuracy = correct / total if total > 0 else 0
+    print(f"\n{'='*60}")
+    print(f"RESULTS: {correct}/{total} correct ({accuracy:.1%} accuracy)")
+    print(f"{'='*60}")
 
-    save_results(all_results)
+    results["summary"] = {
+        "total_test_clips": total,
+        "correct": correct,
+        "accuracy": accuracy,
+    }
 
+    # Per-speaker breakdown
+    for speaker in speakers:
+        speaker_ids = [r for r in results["identifications"] if r["true_speaker"] == speaker]
+        sc = sum(1 for r in speaker_ids if r["correct"])
+        st = len(speaker_ids)
+        if st > 0:
+            print(f"  {speaker}: {sc}/{st} ({sc/st:.0%})")
+            results["summary"][speaker] = {"correct": sc, "total": st, "accuracy": sc / st}
 
-def save_results(results):
-    output_path = os.path.join(os.path.dirname(__file__), "voiceprint_results.json")
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2, default=str)
-    print(f"\nResults saved to {output_path}")
+    # Save results
+    RESULTS_FILE.write_text(json.dumps(results, indent=2))
+    print(f"\nResults saved to {RESULTS_FILE}")
 
 
 if __name__ == "__main__":

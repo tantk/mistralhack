@@ -1,0 +1,14 @@
+[Unit]
+Description=GPU Reverse Proxy (tan:8000 → titan:8001)
+After=network.target tailscaled.service
+
+[Service]
+Type=simple
+User=clawd
+WorkingDirectory=/home/clawd/project/mistral
+ExecStart=/home/clawd/project/mistral/proxy_venv/bin/uvicorn gpu_proxy:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
