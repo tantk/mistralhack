@@ -370,11 +370,10 @@ pub async fn run_agent(
     attendees: &[String],
     voiceprint_store: &SharedVoiceprintStore,
     gpu_available: bool,
-) -> anyhow::Result<(Vec<Segment>, Vec<ActionItemRich>)> {
+) -> anyhow::Result<(Vec<Segment>, Vec<ActionItemRich>, HashMap<String, String>)> {
     let api_key = mistral_api_key();
     if api_key.is_empty() {
-        tracing::info!("No MISTRAL_API_KEY, skipping agent — using threshold matching fallback");
-        return Ok((segments.to_vec(), Vec::new()));
+        anyhow::bail!("MISTRAL_API_KEY missing");
     }
 
     let mut ctx = ToolContext {
@@ -478,8 +477,40 @@ pub async fn run_agent(
     }
 
     let resolved_segments = apply_resolutions(segments, &ctx);
+    let resolution_map = build_resolution_map(&ctx);
 
-    Ok((resolved_segments, ctx.action_items))
+    Ok((resolved_segments, ctx.action_items, resolution_map))
+}
+
+fn build_resolution_map(ctx: &ToolContext) -> HashMap<String, String> {
+    let mut merge_map: HashMap<String, String> = HashMap::new();
+    for (a, b) in &ctx.merges {
+        merge_map.insert(b.clone(), a.clone());
+    }
+
+    // Keep behavior aligned with apply_resolutions: propagate resolutions through merges.
+    let mut effective_resolutions = ctx.resolutions.clone();
+    for (a, b) in &ctx.merges {
+        if effective_resolutions.contains_key(b) && !effective_resolutions.contains_key(a) {
+            let mut res = effective_resolutions[b].clone();
+            res.diarization_speaker = a.clone();
+            res.evidence = format!("Propagated from merged {}: {}", b, res.evidence);
+            effective_resolutions.insert(a.clone(), res);
+        } else if effective_resolutions.contains_key(a) && !effective_resolutions.contains_key(b) {
+            let mut res = effective_resolutions[a].clone();
+            res.diarization_speaker = b.clone();
+            res.evidence = format!("Propagated from merge target {}: {}", a, res.evidence);
+            effective_resolutions.insert(b.clone(), res);
+        }
+    }
+
+    let mut map = HashMap::new();
+    for (label, resolution) in effective_resolutions {
+        // If this label was merged into another one, record the final target label.
+        let canonical = merge_map.get(&label).cloned().unwrap_or(label);
+        map.insert(canonical, resolution.resolved_name);
+    }
+    map
 }
 
 fn apply_resolutions(segments: &[Segment], ctx: &ToolContext) -> Vec<Segment> {

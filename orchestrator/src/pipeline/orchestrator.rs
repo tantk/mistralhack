@@ -135,16 +135,21 @@ pub async fn run_pipeline(
 
     let gpu_available = gpu_health.check_now().await;
     let mut used_threshold_fallback = false;
-    let (resolved_segments, agent_action_items) =
+    let (resolved_segments, agent_action_items, resolution_map) =
         match run_agent(&tx, &segments, &audio_bytes, &acoustic_matches, &attendees, &voiceprint_store, gpu_available).await {
-            Ok((segs, items)) => (segs, items),
+            Ok((segs, items, map)) => (segs, items, map),
             Err(e) => {
                 tracing::warn!(job_id = %job_id, "Agent resolution failed, applying threshold fallback: {e}");
                 // Threshold fallback: apply acoustic matches with similarity >= 0.85
                 used_threshold_fallback = true;
                 let fallback_segments =
                     apply_threshold_fallback(&segments, &acoustic_matches, &tx);
-                (fallback_segments, Vec::new())
+                let fallback_resolution_map: HashMap<String, String> = acoustic_matches
+                    .iter()
+                    .filter(|m| m.cosine_similarity >= 0.85)
+                    .map(|m| (m.diarization_speaker.clone(), m.matched_name.clone()))
+                    .collect();
+                (fallback_segments, Vec::new(), fallback_resolution_map)
             }
         };
 
@@ -180,6 +185,7 @@ pub async fn run_pipeline(
     let speakers = build_speakers_array(
         &resolved_segments,
         &acoustic_matches,
+        &resolution_map,
         used_threshold_fallback,
     );
 
@@ -493,6 +499,7 @@ fn apply_threshold_fallback(
 fn build_speakers_array(
     segments: &[Segment],
     acoustic_matches: &[AcousticMatch],
+    resolution_map: &HashMap<String, String>,
     used_threshold_fallback: bool,
 ) -> Vec<SpeakerInfo> {
     let mut seen: HashMap<String, SpeakerInfo> = HashMap::new();
@@ -503,22 +510,33 @@ fn build_speakers_array(
         .map(|m| (m.diarization_speaker.clone(), m))
         .collect();
 
-    // Build reverse lookup: matched_name -> AcousticMatch so we can find
-    // acoustic data even after the agent resolves "SPEAKER_00" -> "Alice"
-    let acoustic_by_name: HashMap<String, &AcousticMatch> = acoustic_matches
-        .iter()
-        .map(|m| (m.matched_name.clone(), m))
-        .collect();
+    // Build reverse lookup: resolved_name -> strongest acoustic match among
+    // diarization labels that resolved to that name.
+    let mut acoustic_by_resolved_name: HashMap<String, &AcousticMatch> = HashMap::new();
+    for m in acoustic_matches {
+        let Some(resolved_name) = resolution_map.get(&m.diarization_speaker) else {
+            continue;
+        };
+        acoustic_by_resolved_name
+            .entry(resolved_name.clone())
+            .and_modify(|best| {
+                if m.cosine_similarity > best.cosine_similarity {
+                    *best = m;
+                }
+            })
+            .or_insert(m);
+    }
 
     for seg in segments {
         if seen.contains_key(&seg.speaker) {
             continue;
         }
 
-        // Try both lookups: diarization label (unresolved) or resolved name
+        // Try direct diarization lookup first (unresolved segments), then
+        // reverse through resolution map for resolved names.
         let acoustic = acoustic_by_diar
             .get(&seg.speaker)
-            .or_else(|| acoustic_by_name.get(&seg.speaker))
+            .or_else(|| acoustic_by_resolved_name.get(&seg.speaker))
             .copied();
 
         // Determine resolution method and acoustic confidence
@@ -595,8 +613,9 @@ mod tests {
     fn build_speakers_array_uses_reverse_lookup_after_agent_resolution() {
         let segments = vec![segment("Alice")];
         let acoustic_matches = vec![acoustic("SPEAKER_00", "Alice", 0.92)];
+        let resolution_map = HashMap::from([("SPEAKER_00".to_string(), "Alice".to_string())]);
 
-        let speakers = build_speakers_array(&segments, &acoustic_matches, false);
+        let speakers = build_speakers_array(&segments, &acoustic_matches, &resolution_map, false);
         assert_eq!(speakers.len(), 1);
         assert_eq!(speakers[0].name, "Alice");
         assert_eq!(speakers[0].resolution_method, "agent+acoustic");
@@ -607,8 +626,9 @@ mod tests {
     fn build_speakers_array_marks_threshold_fallback_provenance() {
         let segments = vec![segment("Alice")];
         let acoustic_matches = vec![acoustic("SPEAKER_00", "Alice", 0.92)];
+        let resolution_map = HashMap::from([("SPEAKER_00".to_string(), "Alice".to_string())]);
 
-        let speakers = build_speakers_array(&segments, &acoustic_matches, true);
+        let speakers = build_speakers_array(&segments, &acoustic_matches, &resolution_map, true);
         assert_eq!(speakers.len(), 1);
         assert_eq!(speakers[0].name, "Alice");
         assert_eq!(speakers[0].resolution_method, "threshold_fallback");
@@ -618,10 +638,23 @@ mod tests {
     #[test]
     fn build_speakers_array_marks_unresolved_without_acoustic_match() {
         let segments = vec![segment("SPEAKER_00")];
-        let speakers = build_speakers_array(&segments, &[], false);
+        let speakers = build_speakers_array(&segments, &[], &HashMap::new(), false);
         assert_eq!(speakers.len(), 1);
         assert_eq!(speakers[0].name, "SPEAKER_00");
         assert_eq!(speakers[0].resolution_method, "unresolved");
         assert!(speakers[0].acoustic_confidence.is_none());
+    }
+
+    #[test]
+    fn build_speakers_array_uses_resolution_map_when_name_differs_from_acoustic_match() {
+        let segments = vec![segment("Alicia Tan")];
+        let acoustic_matches = vec![acoustic("SPEAKER_00", "Alice", 0.92)];
+        let resolution_map = HashMap::from([("SPEAKER_00".to_string(), "Alicia Tan".to_string())]);
+
+        let speakers = build_speakers_array(&segments, &acoustic_matches, &resolution_map, false);
+        assert_eq!(speakers.len(), 1);
+        assert_eq!(speakers[0].name, "Alicia Tan");
+        assert_eq!(speakers[0].resolution_method, "agent+acoustic");
+        assert!((speakers[0].acoustic_confidence.unwrap_or_default() - 0.92).abs() < 1e-9);
     }
 }
