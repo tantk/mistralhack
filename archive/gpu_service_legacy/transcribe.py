@@ -1,10 +1,11 @@
 import logging
 import os
+from pathlib import Path
 from typing import Generator
 
 import numpy as np
 import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+from transformers import AutoModelForSpeechSeq2Seq
 
 from gpu_service.config import VOXTRAL_MODEL_ID, VOXTRAL_LOCAL_PATH, TARGET_SAMPLE_RATE
 
@@ -12,6 +13,26 @@ logger = logging.getLogger("gpu_service")
 
 _model = None
 _processor = None
+
+
+def _load_processor(model_path: str):
+    """
+    Load VoxtralRealtimeProcessor with MistralCommonBackend tokenizer.
+    The processor requires mistral-common's tekken tokenizer, not the standard HF tokenizer.
+    """
+    from transformers.models.voxtral_realtime.processing_voxtral_realtime import (
+        MistralCommonBackend,
+        VoxtralRealtimeProcessor,
+    )
+    from transformers import VoxtralRealtimeFeatureExtractor
+
+    tekken_path = Path(model_path) / "tekken.json"
+    if not tekken_path.exists():
+        raise FileNotFoundError(f"tekken.json not found at {tekken_path}")
+
+    tokenizer = MistralCommonBackend(tokenizer_path=str(tekken_path))
+    feature_extractor = VoxtralRealtimeFeatureExtractor.from_pretrained(model_path)
+    return VoxtralRealtimeProcessor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
 
 def get_model():
@@ -23,7 +44,7 @@ def get_model():
         model_path = VOXTRAL_LOCAL_PATH if os.path.isdir(VOXTRAL_LOCAL_PATH) else VOXTRAL_MODEL_ID
 
         logger.info("Loading Voxtral model from %s on cuda...", model_path)
-        _processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+        _processor = _load_processor(model_path)
         _model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_path,
             torch_dtype=torch.float16,

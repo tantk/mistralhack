@@ -331,3 +331,31 @@ curl -X POST https://your-space.hf.space/api/transcribe \
   -H "Authorization: Bearer $API_KEY" \
   -F audio=@meeting.wav
 ```
+
+**Direct diarization (no orchestrator):**
+```bash
+curl -X POST http://localhost:8001/diarize -F audio=@meeting.wav
+```
+
+**Voiceprint enrollment and identification:**
+```bash
+# Enroll a speaker
+curl -X POST http://localhost:8001/voiceprint/enroll \
+  -F audio=@alice_sample.wav -F name="Alice Chen"
+
+# Identify from audio segment
+curl -X POST http://localhost:8001/voiceprint/identify \
+  -F audio=@meeting.wav -F start_time=5.0 -F end_time=10.0
+
+# List enrolled speakers
+curl http://localhost:8001/voiceprint/speakers
+```
+
+**Direct transcription (self-hosted Voxtral):**
+```bash
+# Non-streaming
+curl -X POST http://localhost:8080/transcribe -F audio=@meeting.wav
+
+# Streaming
+curl -N -X POST http://localhost:8080/transcribe/stream -F audio=@meeting.wav
+```

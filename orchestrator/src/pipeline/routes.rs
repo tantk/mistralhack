@@ -195,7 +195,7 @@ async fn enroll_speaker(
     let name = name.ok_or((StatusCode::BAD_REQUEST, "No name field".to_string()))?;
 
     // Step 1: Call GPU /embed to extract embedding
-    let gpu_url = diarization_url();
+    let gpu_url = embedding_url();
     let client = reqwest::Client::new();
 
     let part = reqwest::multipart::Part::bytes(audio_bytes)

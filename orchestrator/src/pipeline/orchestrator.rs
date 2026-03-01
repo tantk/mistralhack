@@ -222,7 +222,7 @@ async fn proactive_acoustic_match(
     job_id: &str,
     voiceprint_store: &SharedVoiceprintStore,
 ) -> anyhow::Result<Vec<AcousticMatch>> {
-    let gpu_base = diarization_url();
+    let gpu_base = embedding_url();
 
     // Group diarization segments by speaker, pick the best for each
     let unique_speakers: Vec<String> = {
