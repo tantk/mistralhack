@@ -10,30 +10,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
-      - name: Build Docker image (cached)
-        uses: docker/build-push-action@v6
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
         with:
-          context: .
-          load: true
-          tags: meetingmind:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            orchestrator/target
+          key: cargo-${{ hashFiles('orchestrator/Cargo.lock') }}
+          restore-keys: cargo-
 
-      - name: Extract artifacts
+      - name: Build orchestrator
+        run: cargo build --release --manifest-path orchestrator/Cargo.toml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build frontend
+        run: npm ci && npm run build
+
+      - name: Prepare deploy
         run: |
-          docker create --name mm meetingmind:latest
           mkdir -p deploy/static
-          docker cp mm:/home/app/orchestrator deploy/orchestrator
-          docker cp mm:/home/app/static/. deploy/static/
-          docker rm mm
+          cp orchestrator/target/release/orchestrator deploy/orchestrator
+          cp -r dist/. deploy/static/
           strip deploy/orchestrator
           ls -lh deploy/orchestrator
-
-      - name: Prepare HF deployment
-        run: |
           cp README.md deploy/
           cp Dockerfile.hf deploy/Dockerfile
 
